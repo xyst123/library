@@ -1,57 +1,49 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Layout,
-  Input,
   Button,
   Card,
   Space,
   Typography,
   Select,
-  Badge,
   Spin,
   message,
   Empty,
+  List,
+  Tooltip,
 } from 'antd';
+import { Sender } from '@ant-design/x';
 import {
-  FolderOpenOutlined,
-  SendOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
+  UploadOutlined,
+  FileTextOutlined,
+  DeleteOutlined,
   RobotOutlined,
   UserOutlined,
   BookOutlined,
 } from '@ant-design/icons';
 
-const { Header, Content } = Layout;
+const { Header, Content, Sider } = Layout;
 const { Text, Title } = Typography;
-const { TextArea } = Input;
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface Status {
-  isWatching: boolean;
-  watchPath: string;
-  documentCount: number;
-}
-
 const App: React.FC = () => {
-  const [status, setStatus] = useState<Status>({
-    isWatching: false,
-    watchPath: '',
-    documentCount: 0,
-  });
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [provider, setProvider] = useState('deepseek');
+  const [documentCount, setDocumentCount] = useState(0);
+  const [fileList, setFileList] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 初始化获取状态
+  // 初始化
   useEffect(() => {
-    refreshStatus();
+    refreshData();
   }, []);
 
   // 自动滚动到底部
@@ -59,34 +51,63 @@ const App: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const refreshStatus = async () => {
+  const refreshData = async () => {
     try {
-      const result = await window.electronAPI.getStatus();
-      setStatus(result);
-    } catch (error) {
-      console.error('获取状态失败:', error);
-    }
-  };
-
-  // 选择文件夹
-  const handleSelectFolder = async () => {
-    const folderPath = await window.electronAPI.selectFolder();
-    if (folderPath) {
-      const result = await window.electronAPI.startWatch(folderPath);
-      if (result.success) {
-        message.success(`已开始监听: ${folderPath}`);
-        refreshStatus();
-      } else {
-        message.error(`监听失败: ${result.error}`);
+      if (!window.electronAPI) return;
+      
+      const status = await window.electronAPI.getStatus();
+      setDocumentCount(status.documentCount);
+      
+      const filesResult = await window.electronAPI.getFileList();
+      if (filesResult.success && filesResult.files) {
+        setFileList(filesResult.files);
       }
+    } catch (error) {
+      console.error('刷新数据失败:', error);
     }
   };
 
-  // 停止监听
-  const handleStopWatch = async () => {
-    await window.electronAPI.stopWatch();
-    message.info('已停止监听');
-    refreshStatus();
+  // 上传文件
+  const handleUpload = async () => {
+    if (!window.electronAPI) return;
+    
+    try {
+      const filePaths = await window.electronAPI.selectFiles();
+      if (filePaths && filePaths.length > 0) {
+        setUploading(true);
+        message.loading({ content: '正在索引文件...', key: 'uploading' });
+        
+        const result = await window.electronAPI.ingestFiles(filePaths);
+        
+        if (result.success) {
+          message.success({ content: `成功导入 ${filePaths.length} 个文件`, key: 'uploading' });
+          await refreshData();
+        } else {
+          message.error({ content: `导入失败: ${result.error}`, key: 'uploading' });
+        }
+      }
+    } catch (error: any) {
+      message.error(`操作失败: ${error.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // 删除文件
+  const handleDeleteFile = async (filePath: string) => {
+    if (!window.electronAPI) return;
+    
+    try {
+      const result = await window.electronAPI.deleteFile(filePath);
+      if (result.success) {
+        message.success('文件已删除并更新索引');
+        await refreshData();
+      } else {
+        message.error(`删除失败: ${result.error}`);
+      }
+    } catch (error: any) {
+      message.error(`操作出错: ${error.message}`);
+    }
   };
 
   // 发送查询
@@ -112,14 +133,7 @@ const App: React.FC = () => {
       message.error(`查询出错: ${error.message}`);
     } finally {
       setLoading(false);
-      refreshStatus();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+      refreshData();
     }
   };
 
@@ -135,6 +149,7 @@ const App: React.FC = () => {
           justifyContent: 'space-between',
           borderBottom: '1px solid #2d2d44',
           WebkitAppRegion: 'drag',
+          zIndex: 10,
         } as React.CSSProperties}
       >
         <Space>
@@ -145,183 +160,196 @@ const App: React.FC = () => {
         </Space>
 
         <Space style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <Badge
-            status={status.isWatching ? 'success' : 'default'}
-            text={
-              <Text style={{ color: '#a0a0a0' }}>
-                {status.isWatching
-                  ? `监听中: ${status.watchPath.split('/').pop()}`
-                  : '未监听'}
-              </Text>
-            }
-          />
           <Text style={{ color: '#6366f1' }}>
-            {status.documentCount} 文档块
+            {documentCount} 文档块
           </Text>
         </Space>
       </Header>
 
-      {/* 主内容区 */}
-      <Content
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '16px',
-          overflow: 'hidden',
-        }}
-      >
-        {/* 控制栏 */}
-        <Card
-          size="small"
-          style={{
-            marginBottom: 16,
-            background: '#16213e',
-            border: '1px solid #2d2d44',
+      <Layout>
+        {/* 左侧边栏 - 文件列表 */}
+        <Sider 
+          width={280} 
+          style={{ 
+            background: '#16213e', 
+            borderRight: '1px solid #2d2d44',
+            overflow: 'auto',
+            height: 'calc(100vh - 64px)', // Header height is 64px
           }}
         >
-          <Space wrap>
-            {!status.isWatching ? (
-              <Button
-                type="primary"
-                icon={<FolderOpenOutlined />}
-                onClick={handleSelectFolder}
-              >
-                选择知识库文件夹
-              </Button>
-            ) : (
-              <Button
-                danger
-                icon={<PauseCircleOutlined />}
-                onClick={handleStopWatch}
-              >
-                停止监听
-              </Button>
-            )}
-            <Select
+          <div style={{ padding: 16 }}>
+            <Button
+              block
+              type="primary"
+              icon={<UploadOutlined />}
+              onClick={handleUpload}
+              loading={uploading}
+              style={{ marginBottom: 16 }}
+            >
+              上传文件
+            </Button>
+            
+            <div style={{ marginBottom: 12 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>知识库列表 ({fileList.length})</Text>
+            </div>
+
+            <List
+              dataSource={fileList}
+              renderItem={(item) => (
+                <List.Item
+                  actions={[
+                    <Tooltip title="删除">
+                      <Button 
+                        type="text" 
+                        size="small"
+                        danger 
+                        icon={<DeleteOutlined />} 
+                        onClick={() => handleDeleteFile(item)}
+                      />
+                    </Tooltip>
+                  ]}
+                  style={{ 
+                    padding: '8px 0', 
+                    borderBottom: '1px solid #2d2d44' 
+                  }}
+                >
+                  <List.Item.Meta
+                    avatar={<FileTextOutlined style={{ color: '#a0a0a0', marginLeft: 8 }} />}
+                    title={
+                      <Tooltip title={item}>
+                        <Text style={{ color: '#e0e0e0', fontSize: 13 }} ellipsis>
+                          {item.split('/').pop()}
+                        </Text>
+                      </Tooltip>
+                    }
+                  />
+                </List.Item>
+              )}
+              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Text style={{ color: '#666', fontSize: 12 }}>暂无文件</Text>} /> }}
+            />
+          </div>
+        </Sider>
+
+        {/* 主内容区 - 聊天 */}
+        <Content
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '16px',
+            position: 'relative',
+          }}
+        >
+          {/* 顶部 Provider 选择 */}
+          <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 5 }}>
+             <Select
               value={provider}
               onChange={setProvider}
-              style={{ width: 140 }}
+              style={{ width: 120 }}
               options={[
                 { value: 'deepseek', label: 'DeepSeek' },
                 { value: 'gemini', label: 'Gemini' },
               ]}
+              variant="filled"
             />
-          </Space>
-        </Card>
+          </div>
 
-        {/* 对话区域 */}
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            marginBottom: 16,
-            padding: '8px 0',
-          }}
-        >
-          {messages.length === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <Text style={{ color: '#666' }}>
-                  选择知识库文件夹，然后开始提问
-                </Text>
-              }
-              style={{ marginTop: 100 }}
-            />
-          ) : (
-            messages.map((msg, index) => (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  justifyContent:
-                    msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  marginBottom: 12,
-                }}
-              >
+          <div
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              marginBottom: 16,
+              padding: '8px 0',
+            }}
+          >
+            {messages.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <Text style={{ color: '#666' }}>
+                    在左侧上传文档，然后在这里开始提问
+                  </Text>
+                }
+                style={{ marginTop: 100 }}
+              />
+            ) : (
+              messages.map((msg, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    justifyContent:
+                      msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Card
+                    size="small"
+                    style={{
+                      maxWidth: '75%',
+                      background:
+                        msg.role === 'user'
+                          ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
+                          : '#16213e',
+                      border:
+                        msg.role === 'user' ? 'none' : '1px solid #2d2d44',
+                    }}
+                  >
+                    <Space align="start">
+                      {msg.role === 'assistant' && (
+                        <RobotOutlined
+                          style={{ color: '#6366f1', fontSize: 16 }}
+                        />
+                      )}
+                      <Text
+                        style={{
+                          color: '#fff',
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {msg.content}
+                      </Text>
+                      {msg.role === 'user' && (
+                        <UserOutlined style={{ color: '#fff', fontSize: 16 }} />
+                      )}
+                    </Space>
+                  </Card>
+                </div>
+              ))
+            )}
+            {loading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                 <Card
                   size="small"
                   style={{
-                    maxWidth: '75%',
-                    background:
-                      msg.role === 'user'
-                        ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
-                        : '#16213e',
-                    border:
-                      msg.role === 'user' ? 'none' : '1px solid #2d2d44',
+                    background: '#16213e',
+                    border: '1px solid #2d2d44',
                   }}
                 >
-                  <Space align="start">
-                    {msg.role === 'assistant' && (
-                      <RobotOutlined
-                        style={{ color: '#6366f1', fontSize: 16 }}
-                      />
-                    )}
-                    <Text
-                      style={{
-                        color: '#fff',
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
-                      {msg.content}
-                    </Text>
-                    {msg.role === 'user' && (
-                      <UserOutlined style={{ color: '#fff', fontSize: 16 }} />
-                    )}
+                  <Space>
+                    <Spin size="small" />
+                    <Text style={{ color: '#a0a0a0' }}>思考中...</Text>
                   </Space>
                 </Card>
               </div>
-            ))
-          )}
-          {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <Card
-                size="small"
-                style={{
-                  background: '#16213e',
-                  border: '1px solid #2d2d44',
-                }}
-              >
-                <Space>
-                  <Spin size="small" />
-                  <Text style={{ color: '#a0a0a0' }}>思考中...</Text>
-                </Space>
-              </Card>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-        {/* 输入区域 */}
-        <Card
-          size="small"
-          style={{
-            background: '#16213e',
-            border: '1px solid #2d2d44',
-          }}
-        >
-          <Space.Compact style={{ width: '100%' }}>
-            <TextArea
+          {/* 输入区域 */}
+          <div style={{ padding: '0 16px' }}>
+            <Sender
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="输入你的问题，按 Enter 发送..."
-              autoSize={{ minRows: 1, maxRows: 4 }}
-              style={{ resize: 'none' }}
-              disabled={loading}
-            />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSend}
+              onChange={setInput}
+              onSubmit={() => {
+                handleSend();
+              }}
               loading={loading}
-              disabled={!input.trim()}
-            >
-              发送
-            </Button>
-          </Space.Compact>
-        </Card>
-      </Content>
+              placeholder="输入你的问题，按 Enter 发送..."
+              style={{ width: '100%' }}
+            />
+          </div>
+        </Content>
+      </Layout>
     </Layout>
   );
 };

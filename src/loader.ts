@@ -1,46 +1,48 @@
 import { Document } from '@langchain/core/documents';
-import fs from 'fs';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import * as fs from 'fs';
 
-class SimpleTextSplitter {
-  constructor(private config: { chunkSize: number, chunkOverlap: number }) {}
-  
-  async splitDocuments(docs: Document[]): Promise<Document[]> {
-    const result: Document[] = [];
-    for (const doc of docs) {
-      const chunks = this.splitText(doc.pageContent);
-      chunks.forEach(chunk => {
-        result.push(new Document({ pageContent: chunk, metadata: doc.metadata }));
-      });
-    }
-    return result;
-  }
 
-  private splitText(text: string): string[] {
-    const chunks: string[] = [];
-    let start = 0;
-    while (start < text.length) {
-      let end = start + this.config.chunkSize;
-      if (end > text.length) {
-        end = text.length;
-      }
-      chunks.push(text.slice(start, end));
-      
-      if (end === text.length) break;
-      start = end - this.config.chunkOverlap;
-    }
-    return chunks;
-  }
-}
+import * as path from 'path';
+import * as cheerio from 'cheerio';
+const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
 
 export const loadAndSplit = async (filePath: string): Promise<Document[]> => {
   console.log(`正在加载文件: ${filePath}`);
-  const text = fs.readFileSync(filePath, 'utf-8');
+  
+  let text = '';
+  const ext = path.extname(filePath).toLowerCase();
+
+  try {
+    if (ext === '.pdf') {
+      const dataBuffer = fs.readFileSync(filePath);
+      const data = await pdf(dataBuffer);
+      text = data.text;
+    } else if (ext === '.docx') {
+      const dataBuffer = fs.readFileSync(filePath);
+      const result = await mammoth.extractRawText({ buffer: dataBuffer });
+      text = result.value;
+    } else if (ext === '.html') {
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const $ = cheerio.load(fileContent);
+      text = $('body').text().replace(/\s+/g, ' ').trim();
+    } else {
+      // 默认为文本文件 (.txt, .md, etc.)
+      text = fs.readFileSync(filePath, 'utf-8');
+    }
+  } catch (error) {
+    console.error(`解析文件失败 ${filePath}:`, error);
+    throw error;
+  }
+
   const docs = [new Document({ pageContent: text, metadata: { source: filePath } })];
 
   console.log(`正在分割内容...`);
-  const splitter = new SimpleTextSplitter({
-    chunkSize: 1000,
-    chunkOverlap: 200,
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 500,
+    chunkOverlap: 100,
+    separators: ["\n\n", "\n", "。", "！", "？", "；", "，", " ", ""], // 针对中文优化
   });
 
   const splitDocs = await splitter.splitDocuments(docs);

@@ -15,11 +15,12 @@ async function loadKnowledgeBase() {
     transpileOnly: true,
     compilerOptions: {
       module: 'commonjs',
+      moduleResolution: 'node',
     },
   });
   
   const loaderPath = path.join(__dirname, '../src/loader');
-  const vectorStorePath = path.join(__dirname, '../src/vectorStore');
+  const vectorStorePath = path.join(__dirname, '../src/sqliteStore');
   const ragPath = path.join(__dirname, '../src/rag');
   const configPath = path.join(__dirname, '../src/config');
   const watcherPath = path.join(__dirname, '../src/watcher');
@@ -84,52 +85,84 @@ app.on('activate', () => {
 
 // IPC 处理器
 
-// 选择文件夹
-ipcMain.handle('select-folder', async () => {
+// 选择文件
+ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory'],
-    title: '选择知识库文件夹',
+    properties: ['openFile', 'multiSelections'],
+    title: '选择知识库文件',
+    filters: [
+      { name: 'Documents', extensions: ['txt', 'md', 'pdf', 'docx', 'html'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
   });
   
   if (result.canceled) return null;
-  return result.filePaths[0];
+  return result.filePaths;
 });
 
-// 开始监听
-ipcMain.handle('start-watch', async (_event, folderPath) => {
+
+
+// 导入文件 (手动上传)
+ipcMain.handle('ingest-files', async (_event, filePaths) => {
   try {
     const kb = await loadKnowledgeBase();
+    console.log('IPC: ingest-files', filePaths);
     
-    if (kb.watcherInstance) {
-      isWatching = false;
+    const allDocs = [];
+    for (const filePath of filePaths) {
+      // 检查文件是否存在
+      if (!require('fs').existsSync(filePath)) {
+        console.warn(`File not found: ${filePath}`);
+        continue;
+      }
+      const docs = await kb.loadAndSplit(filePath);
+      allDocs.push(...docs);
     }
     
-    kb.watcherInstance = new kb.Watcher(folderPath);
-    await kb.watcherInstance.start();
-    isWatching = true;
-    watchPath = folderPath;
+    if (allDocs.length > 0) {
+      await kb.ingestDocs(allDocs);
+    }
     
+    // 返回最新的文件列表
     const store = await kb.getVectorStore();
-    documentCount = store.memoryVectors.length;
-    
-    return { success: true, path: folderPath };
+    const files = await store.getSources();
+    return { success: true, files };
+  } catch (error) {
+    console.error('Ingest error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 获取文件列表
+ipcMain.handle('get-file-list', async () => {
+  try {
+    const kb = await loadKnowledgeBase();
+    // 确保初始化
+    if (!kb) await loadKnowledgeBase();
+    const store = await kb.getVectorStore();
+    const files = await store.getSources();
+    return { success: true, files };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// 停止监听
-ipcMain.handle('stop-watch', async () => {
-  const kb = await loadKnowledgeBase();
-  if (kb.watcherInstance) {
-    kb.watcherInstance = null;
+// 删除文件
+ipcMain.handle('delete-file', async (_event, filePath) => {
+  try {
+    const kb = await loadKnowledgeBase();
+    const store = await kb.getVectorStore();
+    await store.deleteDocumentsBySource(filePath);
+    await store.save(path.join(__dirname, '../data/vectors.json')); // using hardcoded path or better reuse logic
+    
+    const files = await store.getSources();
+    return { success: true, files };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
-  isWatching = false;
-  watchPath = '';
-  return { success: true };
 });
 
-// 获取状态
+// 获取状态 (简化: 仅返回文档数)
 ipcMain.handle('get-status', async () => {
   try {
     const kb = await loadKnowledgeBase();
@@ -139,8 +172,6 @@ ipcMain.handle('get-status', async () => {
     // 首次加载可能失败
   }
   return {
-    isWatching,
-    watchPath,
     documentCount,
   };
 });

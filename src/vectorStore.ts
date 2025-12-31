@@ -95,6 +95,16 @@ export class JSONVectorStore extends VectorStore {
     this.memoryVectors = this.memoryVectors.filter(v => v.metadata?.source !== sourcePath);
     console.log(`已删除文件 ${sourcePath} 相关的 ${initialCount - this.memoryVectors.length} 条向量。`);
   }
+
+  async getSources(): Promise<string[]> {
+    const sources = new Set<string>();
+    this.memoryVectors.forEach(v => {
+      if (v.metadata?.source) {
+        sources.add(v.metadata.source);
+      }
+    });
+    return Array.from(sources);
+  }
 }
 
 let storeInstance: JSONVectorStore | null = null;

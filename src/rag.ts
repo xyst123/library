@@ -3,7 +3,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { Document } from '@langchain/core/documents';
 import { getLLM, getEmbeddings } from './model';
-import { getRetriever } from './vectorStore';
+import { getRetriever } from './sqliteStore';
 import { LLMProvider } from './config';
 
 const formatDocumentsAsString = (documents: Document[]): string => {
