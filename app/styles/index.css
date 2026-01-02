@@ -1,8 +1,149 @@
+:root {
+  --tech-primary: #00f3ff;
+  --tech-secondary: #bd00ff;
+  --tech-bg-start: #0f172a;
+  --tech-bg-end: #020617;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+  --neon-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: radial-gradient(circle at top left, #1e1b4b, #0f172a, #000000);
+  color: #e2e8f0;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 科技感工具类 (Tech Utilities) */
+.tech-layout-bg {
+  background: transparent !important; /* 让 body 的渐变透出来 */
+}
+
+.tech-glass {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.tech-header {
+  border-bottom: 1px solid var(--glass-border) !important;
+  background: rgba(15, 23, 42, 0.6) !important; /* 稍微深一点以便阅读 */
+  backdrop-filter: blur(10px);
+}
+
+.tech-sider {
+  border-right: 1px solid var(--glass-border) !important;
+  background: rgba(15, 23, 42, 0.4) !important;
+}
+
+.tech-text-primary {
+  color: var(--tech-primary) !important;
+  text-shadow: 0 0 8px rgba(0, 243, 255, 0.3);
+}
+
+.tech-text-secondary {
+  color: var(--tech-secondary) !important;
+}
+
+/* Antd 覆盖样式 - 科技风 */
+.ant-card {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 12px !important;
+  color: #fff !important;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, var(--tech-primary) 0%, #2563eb 100%) !important;
+  border: none !important;
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+  color: #000 !important; /* 亮色背景配深色文字 */
+  font-weight: 600;
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%) !important;
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+}
+
+.ant-btn-text, .ant-btn-default {
+  color: #94a3b8 !important;
+}
+.ant-btn-text:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--tech-primary) !important;
+}
+
+.ant-input,
+.ant-input-textarea textarea,
+.ant-input-affix-wrapper {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: #fff !important;
+  backdrop-filter: blur(5px);
+}
+
+.ant-input:focus,
+.ant-input-textarea textarea:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  border-color: var(--tech-primary) !important;
+  box-shadow: 0 0 0 2px rgba(0, 243, 255, 0.1) !important;
+}
+
+.ant-select-selector {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: #fff !important;
+}
+
+.ant-select-arrow {
+  color: var(--tech-primary) !important;
+}
+
+.ant-typography {
+  color: #e2e8f0 !important;
+}
+
+.ant-spin-dot-item {
+  background-color: var(--tech-primary) !important;
+}
+
 
 html,
 body,

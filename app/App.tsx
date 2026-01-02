@@ -242,17 +242,16 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout style={{ height: '100vh', background: '#1a1a2e' }}>
+    <Layout className="tech-layout-bg" style={{ height: '100vh' }}>
       {/* 顶部栏 */}
       <Header
+        className="tech-header"
         style={
           {
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
             padding: '0 24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid #2d2d44',
             WebkitAppRegion: 'drag',
             zIndex: 10,
           } as React.CSSProperties
@@ -268,7 +267,7 @@ const App: React.FC = () => {
               { value: 'gemini', label: 'Gemini' },
             ]}
           />
-          <Text style={{ color: '#6366f1' }}>{documentCount} 文档块</Text>
+          <Text className="tech-text-primary" style={{ fontWeight: 'bold' }}>{documentCount} 文档块</Text>
           <Popconfirm
             title="确认清空对话历史？"
             onConfirm={handleClearHistory}
@@ -288,9 +287,8 @@ const App: React.FC = () => {
         {/* 左侧边栏 - 文件列表 */}
         <Sider
           width={280}
+          className="tech-sider"
           style={{
-            background: '#16213e',
-            borderRight: '1px solid #2d2d44',
             overflow: 'auto',
             height: 'calc(100vh - 64px)', // 头部高度为 64px
           }}
@@ -299,9 +297,9 @@ const App: React.FC = () => {
             style={{
               padding: 16,
               height: '100%',
-              backgroundColor: isDragging ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+              backgroundColor: isDragging ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
               transition: 'background-color 0.2s',
-              border: isDragging ? '2px dashed #6366f1' : 'none',
+              border: isDragging ? '2px dashed #00f3ff' : 'none',
             }}
             onDragOver={(e) => {
               e.preventDefault();
@@ -454,19 +452,20 @@ const App: React.FC = () => {
                 >
                   <Card
                     size="small"
-                    style={{
-                      maxWidth: '75%',
-                      background:
-                        msg.role === 'user'
-                          ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
-                          : '#16213e',
-                      border: msg.role === 'user' ? 'none' : '1px solid #2d2d44',
-                    }}
+                      style={{
+                        maxWidth: '75%',
+                        background:
+                          msg.role === 'user'
+                            ? 'linear-gradient(135deg, #00f3ff 0%, #2563eb 100%)'
+                            : 'rgba(255, 255, 255, 0.05)',
+                        border: msg.role === 'user' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                        color: msg.role === 'user' ? '#000' : '#fff', 
+                      }}
                   >
                     <Space orientation="vertical" style={{ width: '100%' }}>
                       <Space align="start">
                         {msg.role === 'assistant' && (
-                          <RobotOutlined style={{ color: '#6366f1', fontSize: 16 }} />
+                          <RobotOutlined style={{ color: '#00f3ff', fontSize: 16 }} />
                         )}
                         <Text
                           style={{
@@ -520,8 +519,8 @@ const App: React.FC = () => {
                 <Card
                   size="small"
                   style={{
-                    background: '#16213e',
-                    border: '1px solid #2d2d44',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                   }}
                 >
                   <Space>

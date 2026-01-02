@@ -11,14 +11,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface RagResult {
-  answer: string;
-  sources: Array<{
-    source: string;
-    content: string;
-    score?: number;
-  }>;
-}
+
 
 const formatHistory = (history: ChatMessage[]): string => {
   return history
@@ -30,60 +23,7 @@ const formatDocumentsAsString = (documents: Document[]): string => {
   return documents.map((doc) => doc.pageContent).join('\n\n');
 };
 
-export const askQuestion = async (
-  question: string,
-  history: ChatMessage[],
-  provider: LLMProvider
-): Promise<RagResult> => {
-  console.log(`正在提问: "${question}" (Provider: ${provider})`);
 
-  const llm = getLLM(provider);
-  const store = await getVectorStore();
-
-  // 1. 检索 (直接获取前 4 个)
-  const embeddings = await store.embeddings.embedQuery(question);
-  const results = await store.similaritySearchVectorWithScore(embeddings, 4);
-
-  const relevantDocs = results.map((d) => d[0]);
-  const sources = results.map((d) => ({
-    source: d[0].metadata.source,
-    content: d[0].pageContent,
-    score: d[1],
-  }));
-
-  // 3. 构建 Prompt
-  const context = formatDocumentsAsString(relevantDocs);
-  const chatHistory = formatHistory(history.slice(-6)); // 只保留最近 6 条
-
-  const template = `你是本地知识库助手。请根据以下上下文和对话历史回答问题。如果不知道，请直接回答不知道。
-
-上下文 (根据相关性排序):
-{context}
-
-对话历史:
-{chat_history}
-
-当前问题: {question}
-
-回答:`;
-
-  const prompt = PromptTemplate.fromTemplate(template);
-
-  // 4. 生成回答
-  const chain = RunnableSequence.from([prompt, llm, new StringOutputParser()]);
-
-  console.log('正在生成回答...');
-  const answer = await chain.invoke({
-    context,
-    chat_history: chatHistory,
-    question,
-  });
-
-  return {
-    answer,
-    sources,
-  };
-};
 
 export interface RagStreamResult {
   stream: AsyncGenerator<string>;
@@ -120,9 +60,12 @@ export const askQuestionStream = async (
   const context = formatDocumentsAsString(relevantDocs);
   const chatHistory = formatHistory(history.slice(-6));
 
-  const template = `你是本地知识库助手。请根据以下上下文和对话历史回答问题。如果不知道，请直接回答不知道。
+  const template = `你是本地知识库助手。你同时拥有通用知识。
+请优先根据以下【上下文】和【对话历史】来回答问题。
+如果【上下文】中包含答案，请务必引用。
+如果【上下文】不相关或为空，请忽略上下文，使用你的**通用知识**进行回答。
 
-上下文 (根据相关性排序):
+上下文:
 {context}
 
 对话历史:

@@ -1,6 +1,6 @@
 import { loadAndSplit } from './loader';
 import { ingestDocs } from './sqliteStore';
-import { askQuestion } from './rag';
+import { askQuestionStream } from './rag';
 import { LLMProvider } from './config';
 
 import path from 'path';
@@ -43,9 +43,22 @@ const main = async () => {
         }
       }
 
-      const answer = await askQuestion(question, [], provider);
+      const { stream, sources } = await askQuestionStream(question, [], provider);
       console.log('\n--- 回答 ---\n');
-      console.log(answer);
+      
+      let fullAnswer = '';
+      for await (const chunk of stream) {
+        process.stdout.write(chunk);
+        fullAnswer += chunk;
+      }
+      
+      if (sources && sources.length > 0) {
+        console.log('\n\n--- 参考来源 ---\n');
+        sources.forEach((s: { source: string; score?: number }) => {
+          console.log(`- ${s.source.split('/').pop()} (相似度: ${(1 - (s.score || 0)).toFixed(2)})`);
+        });
+      }
+      
       console.log('\n--------------\n');
     } else {
       console.error('未知命令。请使用 "ingest" 或 "query".');

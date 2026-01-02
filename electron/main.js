@@ -6,7 +6,8 @@ const { Worker } = require('worker_threads');
 let mainWindow = null;
 let worker = null;
 // 存储挂起请求的 Map: id -> { resolve, reject }
-const pendingRequests = new Map();
+// 存储挂起请求的 Map: id -> { resolve, reject }
+var pendingRequests = new Map();
 
 function createWorker() {
   const workerPath = path.join(__dirname, 'worker.js');
