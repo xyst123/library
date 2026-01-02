@@ -7,7 +7,9 @@
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 && ELECTRON_RUN_AS_NODE= electron .",
     "build": "vite build",
-    "cli": "ts-node src/index.ts"
+    "cli": "ts-node src/index.ts",
+    "lint": "eslint . --ext ts,tsx,js --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write ."
   },
   "keywords": [],
   "author": "",
@@ -44,8 +46,15 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "electron": "^39.2.7",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.34.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "prettier": "^3.2.5",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
+    "typescript": "^5.5.4",
     "vite": "^6.0.7",
     "wait-on": "^8.0.3"
   }

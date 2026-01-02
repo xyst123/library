@@ -1,8 +1,8 @@
-import { VectorStore } from "@langchain/core/vectorstores";
-import { Embeddings } from "@langchain/core/embeddings";
-import { Document } from "@langchain/core/documents";
+import { VectorStore } from '@langchain/core/vectorstores';
+import { Embeddings } from '@langchain/core/embeddings';
+import { Document } from '@langchain/core/documents';
 import Database from 'better-sqlite3';
-import * as sqlite_vss from "sqlite-vss";
+import * as sqlite_vss from 'sqlite-vss';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getEmbeddings } from './model';
@@ -19,15 +19,15 @@ export class SQLiteVectorStore extends VectorStore {
 
   constructor(embeddings: Embeddings, dbPath: string) {
     super(embeddings, {});
-    
+
     this.db = new Database(dbPath);
     sqlite_vss.load(this.db);
-    
+
     this.initDB();
   }
 
   _vectorstoreType(): string {
-    return "sqlite";
+    return 'sqlite';
   }
 
   private initDB() {
@@ -53,7 +53,7 @@ export class SQLiteVectorStore extends VectorStore {
   async addDocuments(documents: Document[]): Promise<void> {
     const texts = documents.map(({ pageContent }) => pageContent);
     const embeddings = await this.embeddings.embedDocuments(texts);
-    
+
     const insertDoc = this.db.prepare(`
       INSERT INTO documents (content, metadata, source) VALUES (?, ?, ?)
     `);
@@ -66,10 +66,10 @@ export class SQLiteVectorStore extends VectorStore {
         const doc = docs[i];
         const vec = vecs[i];
         const source = doc.metadata?.source || '';
-        
+
         const info = insertDoc.run(doc.pageContent, JSON.stringify(doc.metadata), source);
         const rowid = info.lastInsertRowid;
-        
+
         insertVector.run(rowid, JSON.stringify(vec));
       }
     });
@@ -78,7 +78,7 @@ export class SQLiteVectorStore extends VectorStore {
   }
 
   async addVectors(vectors: number[][], documents: Document[]): Promise<void> {
-    // Reusing logic in addDocuments for simplicity, or implementation here if specific
+    // 为了简单起见复用 addDocuments 的逻辑，或者在此处实现特定逻辑
     const insertDoc = this.db.prepare(`
       INSERT INTO documents (content, metadata, source) VALUES (?, ?, ?)
     `);
@@ -91,10 +91,10 @@ export class SQLiteVectorStore extends VectorStore {
         const doc = docs[i];
         const vec = vecs[i];
         const source = doc.metadata?.source || '';
-        
+
         const info = insertDoc.run(doc.pageContent, JSON.stringify(doc.metadata), source);
         const rowid = info.lastInsertRowid;
-        
+
         insertVector.run(rowid, JSON.stringify(vec));
       }
     });
@@ -116,13 +116,14 @@ export class SQLiteVectorStore extends VectorStore {
       left join documents d on m.rowid = d.rowid
     `);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results = stmt.all(JSON.stringify(query), k) as any[];
 
-    return results.map(row => {
+    return results.map((row) => {
       const metadata = JSON.parse(row.metadata);
       const doc = new Document({
         pageContent: row.content,
-        metadata: metadata
+        metadata: metadata,
       });
       // 距离越小越相似，LangChain通常期望相似度分数
       // 这里直接返回距离作为 score，调用者需要知晓
@@ -133,7 +134,7 @@ export class SQLiteVectorStore extends VectorStore {
   async deleteDocumentsBySource(sourcePath: string): Promise<void> {
     const findIds = this.db.prepare(`SELECT rowid FROM documents WHERE source = ?`);
     const rows = findIds.all(sourcePath) as { rowid: number }[];
-    
+
     if (rows.length === 0) return;
 
     const deleteDoc = this.db.prepare(`DELETE FROM documents WHERE rowid = ?`);
@@ -146,14 +147,14 @@ export class SQLiteVectorStore extends VectorStore {
       }
     });
 
-    transaction(rows.map(r => r.rowid));
+    transaction(rows.map((r) => r.rowid));
     console.log(`已删除文件 ${sourcePath} 相关的 ${rows.length} 条向量。`);
   }
 
   async getSources(): Promise<string[]> {
     const stmt = this.db.prepare(`SELECT DISTINCT source FROM documents`);
     const rows = stmt.all() as { source: string }[];
-    return rows.map(r => r.source).filter(s => !!s);
+    return rows.map((r) => r.source).filter((s) => !!s);
   }
 
   static async load(path: string, embeddings: Embeddings): Promise<SQLiteVectorStore> {
@@ -164,11 +165,11 @@ export class SQLiteVectorStore extends VectorStore {
 let storeInstance: SQLiteVectorStore | null = null;
 
 export const getVectorStore = async (): Promise<SQLiteVectorStore> => {
-    if (storeInstance) return storeInstance;
-    const embeddings = await getEmbeddings();
-    storeInstance = await SQLiteVectorStore.load(DB_PATH, embeddings);
-    return storeInstance;
-}
+  if (storeInstance) return storeInstance;
+  const embeddings = await getEmbeddings();
+  storeInstance = await SQLiteVectorStore.load(DB_PATH, embeddings);
+  return storeInstance;
+};
 
 export const ingestDocs = async (docs: Document[]) => {
   console.log(`正在导入 ${docs.length} 个文档...`);

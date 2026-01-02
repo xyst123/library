@@ -1,5 +1,5 @@
 import { loadAndSplit } from './loader';
-import { ingestDocs } from './vectorStore';
+import { ingestDocs } from './sqliteStore';
 import { askQuestion } from './rag';
 import { LLMProvider } from './config';
 import { Watcher } from './watcher';
@@ -24,7 +24,6 @@ const main = async () => {
       const absolutePath = path.resolve(filePath);
       const docs = await loadAndSplit(absolutePath);
       await ingestDocs(docs);
-      
     } else if (command === 'watch') {
       const dirPath = args[1];
       if (!dirPath) {
@@ -45,19 +44,18 @@ const main = async () => {
       let provider = LLMProvider.DEEPSEEK; // 默认
       const providerIndex = args.indexOf('--provider');
       if (providerIndex !== -1 && args[providerIndex + 1]) {
-         const p = args[providerIndex + 1].toLowerCase();
-         if (Object.values(LLMProvider).includes(p as LLMProvider)) {
-            provider = p as LLMProvider;
-         } else {
-             console.warn(`未知提供商 '${p}', 使用默认值: ${provider}`);
-         }
+        const p = args[providerIndex + 1].toLowerCase();
+        if (Object.values(LLMProvider).includes(p as LLMProvider)) {
+          provider = p as LLMProvider;
+        } else {
+          console.warn(`未知提供商 '${p}', 使用默认值: ${provider}`);
+        }
       }
 
-      const answer = await askQuestion(question, provider);
+      const answer = await askQuestion(question, [], provider);
       console.log('\n--- 回答 ---\n');
       console.log(answer);
       console.log('\n--------------\n');
-      
     } else {
       console.error('未知命令。请使用 "ingest", "query" 或 "watch".');
     }

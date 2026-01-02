@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import { Document } from '@langchain/core/documents';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import * as fs from 'fs';
-
 
 import * as path from 'path';
 import * as cheerio from 'cheerio';
@@ -10,7 +10,7 @@ const mammoth = require('mammoth');
 
 export const loadAndSplit = async (filePath: string): Promise<Document[]> => {
   console.log(`正在加载文件: ${filePath}`);
-  
+
   let text = '';
   const ext = path.extname(filePath).toLowerCase();
 
@@ -42,7 +42,7 @@ export const loadAndSplit = async (filePath: string): Promise<Document[]> => {
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 500,
     chunkOverlap: 100,
-    separators: ["\n\n", "\n", "。", "！", "？", "；", "，", " ", ""], // 针对中文优化
+    separators: ['\n\n', '\n', '。', '！', '？', '；', '，', ' ', ''], // 针对中文优化
   });
 
   const splitDocs = await splitter.splitDocuments(docs);

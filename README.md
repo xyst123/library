@@ -60,11 +60,13 @@ npx ts-node src/index.ts ingest docs/sample.txt
 #### ❓ 提问 (Query)
 
 **使用 DeepSeek (默认)**
+
 ```bash
 npx ts-node src/index.ts query "这里填入你的问题" --provider deepseek
 ```
 
 **使用 Gemini**
+
 ```bash
 npx ts-node src/index.ts query "这里填入你的问题" --provider gemini
 ```
@@ -79,7 +81,8 @@ A: 请检查是否运行了 `npm install`。部分依赖（如 `@huggingface/tra
 A: 这是因为首次下载嵌入模型需要访问 HuggingFace。请检查您的网络连接。下载成功后，模型会缓存到本地，以后无需再次下载。
 
 **Q: 为什么生成的回答不准确？**
-A: 
+A:
+
 1. 检查导入的文档是否包含相关信息。
 2. 尝试调整 `src/rag.ts` 中的 Prompt 模板。
 3. 确保使用的 LLM 模型（DeepSeek/Gemini）API Key 有效且额度充足。

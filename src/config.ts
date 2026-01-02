@@ -19,5 +19,5 @@ export const getEnv = (key: string): string => {
 
 export const CONFIG = {
   deepseekApiKey: process.env.DEEPSEEK_API_KEY,
-  googleApiKey: process.env.GOOGLE_API_KEY, 
+  googleApiKey: process.env.GOOGLE_API_KEY,
 };

@@ -1,15 +1,14 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
-let isWatching = false;
-let watchPath = '';
 let documentCount = 0;
 let knowledgeBase = null;
 
 async function loadKnowledgeBase() {
   if (knowledgeBase) return knowledgeBase;
-  
+
   // 使用 ts-node 注册
   require('ts-node').register({
     transpileOnly: true,
@@ -18,19 +17,19 @@ async function loadKnowledgeBase() {
       moduleResolution: 'node',
     },
   });
-  
+
   const loaderPath = path.join(__dirname, '../src/loader');
   const vectorStorePath = path.join(__dirname, '../src/sqliteStore');
   const ragPath = path.join(__dirname, '../src/rag');
   const configPath = path.join(__dirname, '../src/config');
   const watcherPath = path.join(__dirname, '../src/watcher');
-  
+
   const { loadAndSplit } = require(loaderPath);
   const { getVectorStore, ingestDocs } = require(vectorStorePath);
   const { askQuestion } = require(ragPath);
   const { LLMProvider } = require(configPath);
   const { Watcher } = require(watcherPath);
-  
+
   knowledgeBase = {
     loadAndSplit,
     getVectorStore,
@@ -40,7 +39,7 @@ async function loadKnowledgeBase() {
     Watcher,
     watcherInstance: null,
   };
-  
+
   return knowledgeBase;
 }
 
@@ -91,44 +90,42 @@ ipcMain.handle('select-files', async () => {
     properties: ['openFile', 'multiSelections'],
     title: '选择知识库文件',
     filters: [
-      { name: 'Documents', extensions: ['txt', 'md', 'pdf', 'docx', 'html'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
+      { name: '文档', extensions: ['txt', 'md', 'pdf', 'docx', 'html'] },
+      { name: '所有文件', extensions: ['*'] },
+    ],
   });
-  
+
   if (result.canceled) return null;
   return result.filePaths;
 });
-
-
 
 // 导入文件 (手动上传)
 ipcMain.handle('ingest-files', async (_event, filePaths) => {
   try {
     const kb = await loadKnowledgeBase();
     console.log('IPC: ingest-files', filePaths);
-    
+
     const allDocs = [];
     for (const filePath of filePaths) {
       // 检查文件是否存在
       if (!require('fs').existsSync(filePath)) {
-        console.warn(`File not found: ${filePath}`);
+        console.warn(`文件未找到: ${filePath}`);
         continue;
       }
       const docs = await kb.loadAndSplit(filePath);
       allDocs.push(...docs);
     }
-    
+
     if (allDocs.length > 0) {
       await kb.ingestDocs(allDocs);
     }
-    
+
     // 返回最新的文件列表
     const store = await kb.getVectorStore();
     const files = await store.getSources();
     return { success: true, files };
   } catch (error) {
-    console.error('Ingest error:', error);
+    console.error('导入错误:', error);
     return { success: false, error: error.message };
   }
 });
@@ -153,8 +150,8 @@ ipcMain.handle('delete-file', async (_event, filePath) => {
     const kb = await loadKnowledgeBase();
     const store = await kb.getVectorStore();
     await store.deleteDocumentsBySource(filePath);
-    await store.save(path.join(__dirname, '../data/vectors.json')); // using hardcoded path or better reuse logic
-    
+    await store.save(path.join(__dirname, '../data/vectors.json')); // 使用硬编码路径或更好的复用逻辑
+
     const files = await store.getSources();
     return { success: true, files };
   } catch (error) {
@@ -177,17 +174,20 @@ ipcMain.handle('get-status', async () => {
 });
 
 // 查询
-ipcMain.handle('query', async (_event, question, provider) => {
+// 提问 (原 query)
+ipcMain.handle('ask-question', async (_event, question, history, provider) => {
   try {
     const kb = await loadKnowledgeBase();
     const llmProvider = provider === 'gemini' ? kb.LLMProvider.GEMINI : kb.LLMProvider.DEEPSEEK;
-    const answer = await kb.askQuestion(question, llmProvider);
-    
+    const result = await kb.askQuestion(question, history || [], llmProvider);
+
     const store = await kb.getVectorStore();
-    documentCount = store.memoryVectors.length;
-    
-    return { success: true, answer };
+    documentCount = store.memoryVectors ? store.memoryVectors.length : 0; // SQLite store might not have this prop exposed directly same way, but let's safe check or remove if not needed for count update instantly
+
+    // 返回答案和来源
+    return { success: true, answer: result.answer, sources: result.sources };
   } catch (error) {
+    console.error('提问错误:', error);
     return { success: false, error: error.message };
   }
 });

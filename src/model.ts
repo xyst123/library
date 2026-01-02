@@ -1,7 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/huggingface_transformers';
-import { LLMProvider, CONFIG, getEnv } from './config';
+import { LLMProvider, getEnv } from './config';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Embeddings } from '@langchain/core/embeddings';
 
@@ -11,13 +11,15 @@ export const getEmbeddings = async (): Promise<Embeddings> => {
   if (!embeddingInstance) {
     console.log('正在初始化本地 Embeddings (Xenova/all-MiniLM-L6-v2)...');
     try {
-        // 注意: 底层 transformers 库会显示 "dtype not specified" 警告，这是正常的（使用 CPU 默认 fp32）
-        embeddingInstance = new HuggingFaceTransformersEmbeddings({
-          model: 'Xenova/all-MiniLM-L6-v2',
-        });
+      // 注意: 底层 transformers 库会显示 "dtype not specified" 警告，这是正常的（使用 CPU 默认 fp32）
+      embeddingInstance = new HuggingFaceTransformersEmbeddings({
+        model: 'Xenova/all-MiniLM-L6-v2',
+      });
     } catch (e) {
-        console.error("加载 Embeddings 失败。请确保已安装 @langchain/community 和 @huggingface/transformers。");
-        throw e;
+      console.error(
+        '加载 Embeddings 失败。请确保已安装 @langchain/community 和 @huggingface/transformers。'
+      );
+      throw e;
     }
   }
   return embeddingInstance;
