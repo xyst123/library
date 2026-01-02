@@ -1,46 +1,47 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const { Worker } = require('worker_threads');
 
 let mainWindow = null;
-let documentCount = 0;
-let knowledgeBase = null;
+let worker = null;
+// Map to store pending requests: id -> { resolve, reject }
+const pendingRequests = new Map();
 
-async function loadKnowledgeBase() {
-  if (knowledgeBase) return knowledgeBase;
+function createWorker() {
+  const workerPath = path.join(__dirname, 'worker.js');
+  worker = new Worker(workerPath);
 
-  // 使用 ts-node 注册
-  require('ts-node').register({
-    transpileOnly: true,
-    compilerOptions: {
-      module: 'commonjs',
-      moduleResolution: 'node',
-    },
+  worker.on('message', (message) => {
+    const { id, success, data, error } = message;
+    if (pendingRequests.has(id)) {
+      const { resolve, reject } = pendingRequests.get(id);
+      pendingRequests.delete(id);
+      if (success) {
+        resolve(data);
+      } else {
+        reject(new Error(error));
+      }
+    }
   });
 
-  const loaderPath = path.join(__dirname, '../src/loader');
-  const vectorStorePath = path.join(__dirname, '../src/sqliteStore');
-  const ragPath = path.join(__dirname, '../src/rag');
-  const configPath = path.join(__dirname, '../src/config');
-  const watcherPath = path.join(__dirname, '../src/watcher');
+  worker.on('error', (err) => {
+    console.error('Worker error:', err);
+  });
 
-  const { loadAndSplit } = require(loaderPath);
-  const { getVectorStore, ingestDocs } = require(vectorStorePath);
-  const { askQuestion } = require(ragPath);
-  const { LLMProvider } = require(configPath);
-  const { Watcher } = require(watcherPath);
+  worker.on('exit', (code) => {
+    if (code !== 0) {
+      console.error(new Error(`Worker stopped with exit code ${code}`));
+    }
+  });
+}
 
-  knowledgeBase = {
-    loadAndSplit,
-    getVectorStore,
-    ingestDocs,
-    askQuestion,
-    LLMProvider,
-    Watcher,
-    watcherInstance: null,
-  };
-
-  return knowledgeBase;
+function sendToWorker(type, data = {}) {
+  return new Promise((resolve, reject) => {
+    const id = Math.random().toString(36).substring(7);
+    pendingRequests.set(id, { resolve, reject });
+    worker.postMessage({ id, data: { type, ...data } });
+  });
 }
 
 function createWindow() {
@@ -68,7 +69,13 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWorker();
+  createWindow();
+  
+  // Initialize worker
+  sendToWorker('init').catch(err => console.error('Worker init failed:', err));
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -82,9 +89,9 @@ app.on('activate', () => {
   }
 });
 
-// IPC 处理器
+// IPC 处理器 proxy to Worker
 
-// 选择文件
+// 选择文件 (Still runs in Main Process as it opens a native dialog)
 ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile', 'multiSelections'],
@@ -102,28 +109,8 @@ ipcMain.handle('select-files', async () => {
 // 导入文件 (手动上传)
 ipcMain.handle('ingest-files', async (_event, filePaths) => {
   try {
-    const kb = await loadKnowledgeBase();
-    console.log('IPC: ingest-files', filePaths);
-
-    const allDocs = [];
-    for (const filePath of filePaths) {
-      // 检查文件是否存在
-      if (!require('fs').existsSync(filePath)) {
-        console.warn(`文件未找到: ${filePath}`);
-        continue;
-      }
-      const docs = await kb.loadAndSplit(filePath);
-      allDocs.push(...docs);
-    }
-
-    if (allDocs.length > 0) {
-      await kb.ingestDocs(allDocs);
-    }
-
-    // 返回最新的文件列表
-    const store = await kb.getVectorStore();
-    const files = await store.getSources();
-    return { success: true, files };
+    const result = await sendToWorker('ingest-files', { filePaths });
+    return result; // result is { success: true, files: [...] }
   } catch (error) {
     console.error('导入错误:', error);
     return { success: false, error: error.message };
@@ -133,12 +120,8 @@ ipcMain.handle('ingest-files', async (_event, filePaths) => {
 // 获取文件列表
 ipcMain.handle('get-file-list', async () => {
   try {
-    const kb = await loadKnowledgeBase();
-    // 确保初始化
-    if (!kb) await loadKnowledgeBase();
-    const store = await kb.getVectorStore();
-    const files = await store.getSources();
-    return { success: true, files };
+    const result = await sendToWorker('get-file-list');
+    return result;
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -147,45 +130,29 @@ ipcMain.handle('get-file-list', async () => {
 // 删除文件
 ipcMain.handle('delete-file', async (_event, filePath) => {
   try {
-    const kb = await loadKnowledgeBase();
-    const store = await kb.getVectorStore();
-    await store.deleteDocumentsBySource(filePath);
-    await store.save(path.join(__dirname, '../data/vectors.json')); // 使用硬编码路径或更好的复用逻辑
-
-    const files = await store.getSources();
-    return { success: true, files };
+    const result = await sendToWorker('delete-file', { filePath });
+    return result;
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// 获取状态 (简化: 仅返回文档数)
+// 获取状态
 ipcMain.handle('get-status', async () => {
   try {
-    const kb = await loadKnowledgeBase();
-    const store = await kb.getVectorStore();
-    documentCount = store.memoryVectors.length;
+    const result = await sendToWorker('get-status');
+    return result;
   } catch (e) {
-    // 首次加载可能失败
+    return { documentCount: 0 };
   }
-  return {
-    documentCount,
-  };
 });
 
 // 查询
 // 提问 (原 query)
 ipcMain.handle('ask-question', async (_event, question, history, provider) => {
   try {
-    const kb = await loadKnowledgeBase();
-    const llmProvider = provider === 'gemini' ? kb.LLMProvider.GEMINI : kb.LLMProvider.DEEPSEEK;
-    const result = await kb.askQuestion(question, history || [], llmProvider);
-
-    const store = await kb.getVectorStore();
-    documentCount = store.memoryVectors ? store.memoryVectors.length : 0; // SQLite store might not have this prop exposed directly same way, but let's safe check or remove if not needed for count update instantly
-
-    // 返回答案和来源
-    return { success: true, answer: result.answer, sources: result.sources };
+    const result = await sendToWorker('ask-question', { question, history, provider });
+    return result;
   } catch (error) {
     console.error('提问错误:', error);
     return { success: false, error: error.message };
