@@ -5,7 +5,7 @@ import zhCN from 'antd/locale/zh_CN';
 import App from './App';
 import './styles/index.css';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById('root') as HTMLDivElement).render(
   <React.StrictMode>
     <ConfigProvider
       locale={zhCN}

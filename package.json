@@ -9,7 +9,9 @@
     "build": "vite build",
     "cli": "ts-node src/index.ts",
     "lint": "eslint . --ext ts,tsx,js --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "dist": "npm run build && electron-builder",
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [],
   "author": "",
@@ -25,7 +27,6 @@
     "antd": "^6.1.3",
     "better-sqlite3": "^11.10.0",
     "cheerio": "^1.1.2",
-    "chokidar": "^5.0.0",
     "classnames": "^2.5.1",
     "dotenv": "^16.4.5",
     "langchain": "^1.2.3",
@@ -33,7 +34,6 @@
     "pdf-parse": "^1.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "sharp": "^0.34.5",
     "sqlite-vss": "^0.1.2",
     "uuid": "^13.0.0"
   },
@@ -43,19 +43,48 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
-    "electron": "^39.2.7",
+    "electron": "^33.0.0",
+    "electron-builder": "^26.0.12",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "@typescript-eslint/eslint-plugin": "^7.1.0",
-    "@typescript-eslint/parser": "^7.1.0",
     "prettier": "^3.2.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",
     "vite": "^6.0.7",
     "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.library.app",
+    "productName": "LocalLibrary",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dmg",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "asarUnpack": [
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/better-sqlite3/**/*",
+      "**/node_modules/sqlite-vss/**/*"
+    ]
   }
 }

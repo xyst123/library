@@ -23,6 +23,33 @@ declare global {
         sources?: Array<{ source: string; content: string; score?: number }>;
         error?: string;
       }>;
+      getHistory: () => Promise<{
+        success: boolean;
+        history?: { role: 'user' | 'assistant'; content: string }[];
+        error?: string;
+      }>;
+      addHistory: (
+        role: 'user' | 'assistant',
+        content: string
+      ) => Promise<{ success: boolean; error?: string }>;
+
+      clearHistory: () => Promise<{ success: boolean; error?: string }>;
+
+      // Events
+      onAnswerStart: (
+        callback: (
+          event: unknown,
+          data: { sources: Array<{ source: string; content: string; score?: number }> }
+        ) => void
+      ) => void;
+      onAnswerChunk: (callback: (event: unknown, data: { chunk: string }) => void) => void;
+      onIngestProgress: (
+        callback: (
+          event: unknown,
+          data: { current: number; total: number; status: string; file: string }
+        ) => void
+      ) => void;
+      removeListener: (channel: string) => void;
     };
   }
 }

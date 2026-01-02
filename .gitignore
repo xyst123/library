@@ -2,3 +2,9 @@ node_modules
 dist
 dist-electron
 .env
+
+# Build Output
+release
+
+# Local Data
+data

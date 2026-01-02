@@ -3,27 +3,32 @@
 // @ts-nocheck
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.log('Preload script loaded!');
-
-// 暴露安全的 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
-  // 选择文件
   selectFiles: () => ipcRenderer.invoke('select-files'),
-
-  // 导入文件
   ingestFiles: (filePaths) => ipcRenderer.invoke('ingest-files', filePaths),
-
-  // 获取文件列表
   getFileList: () => ipcRenderer.invoke('get-file-list'),
-
-  // 删除文件
   deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath),
-
-  // 获取状态 (简化)
   getStatus: () => ipcRenderer.invoke('get-status'),
-
-  // 查询
-  // 提问
   askQuestion: (question, history, provider) =>
     ipcRenderer.invoke('ask-question', question, history, provider),
+
+  getHistory: () => ipcRenderer.invoke('get-history'),
+  addHistory: (role, content) => ipcRenderer.invoke('add-history', role, content),
+  clearHistory: () => ipcRenderer.invoke('clear-history'),
+
+  // 事件监听
+  onAnswerStart: (callback) => {
+    ipcRenderer.on('answer-start', callback);
+  },
+  onAnswerChunk: (callback) => {
+    ipcRenderer.on('answer-chunk', callback);
+  },
+  onIngestProgress: (callback) => {
+    ipcRenderer.on('ingest-progress', callback);
+  },
+  removeListener: (channel) => {
+    ipcRenderer.removeAllListeners(channel);
+  },
 });
+
+console.log('预加载脚本已加载!');

@@ -1,10 +1,9 @@
 import { VectorStore } from '@langchain/core/vectorstores';
-import { Embeddings } from '@langchain/core/embeddings';
+import type { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
 import Database from 'better-sqlite3';
-import * as sqlite_vss from 'sqlite-vss';
-import * as path from 'path';
-import * as fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 import { getEmbeddings } from './model';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -21,7 +20,17 @@ export class SQLiteVectorStore extends VectorStore {
     super(embeddings, {});
 
     this.db = new Database(dbPath);
+    console.log('[SQLite] 数据库已打开。');
+  }
+
+  async initialize() {
+    // 使用 new Function 绕过 TS 编译，确保在 CommonJS 环境中也能发送真正的 ESM import
+    // 否则 ts-node/tsc 可能会将其编译为 require()，导致 ERR_REQUIRE_ESM 错误
+    const dynamicImport = new Function('specifier', 'return import(specifier)');
+    const sqlite_vss = await dynamicImport('sqlite-vss');
+
     sqlite_vss.load(this.db);
+    console.log('[SQLite] sqlite-vss 已加载。');
 
     this.initDB();
   }
@@ -46,6 +55,16 @@ export class SQLiteVectorStore extends VectorStore {
     this.db.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS vss_documents USING vss0(
         vector(384)
+      );
+    `);
+
+    // 创建对话历史表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp INTEGER DEFAULT (strftime('%s', 'now'))
       );
     `);
   }
@@ -132,13 +151,13 @@ export class SQLiteVectorStore extends VectorStore {
   }
 
   async deleteDocumentsBySource(sourcePath: string): Promise<void> {
-    const findIds = this.db.prepare(`SELECT rowid FROM documents WHERE source = ?`);
+    const findIds = this.db.prepare('SELECT rowid FROM documents WHERE source = ?');
     const rows = findIds.all(sourcePath) as { rowid: number }[];
 
     if (rows.length === 0) return;
 
-    const deleteDoc = this.db.prepare(`DELETE FROM documents WHERE rowid = ?`);
-    const deleteVec = this.db.prepare(`DELETE FROM vss_documents WHERE rowid = ?`);
+    const deleteDoc = this.db.prepare('DELETE FROM documents WHERE rowid = ?');
+    const deleteVec = this.db.prepare('DELETE FROM vss_documents WHERE rowid = ?');
 
     const transaction = this.db.transaction((ids: number[]) => {
       for (const id of ids) {
@@ -152,13 +171,38 @@ export class SQLiteVectorStore extends VectorStore {
   }
 
   async getSources(): Promise<string[]> {
-    const stmt = this.db.prepare(`SELECT DISTINCT source FROM documents`);
+    const stmt = this.db.prepare('SELECT DISTINCT source FROM documents');
     const rows = stmt.all() as { source: string }[];
     return rows.map((r) => r.source).filter((s) => !!s);
   }
 
-  static async load(path: string, embeddings: Embeddings): Promise<SQLiteVectorStore> {
-    return new SQLiteVectorStore(embeddings, path);
+  async getDocumentCount(): Promise<number> {
+    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM documents');
+    const result = stmt.get() as { count: number };
+    return result.count;
+  }
+
+  static async load(dbPath: string, embeddings: Embeddings): Promise<SQLiteVectorStore> {
+    const store = new SQLiteVectorStore(embeddings, dbPath);
+    await store.initialize();
+    return store;
+  }
+
+  // 聊天历史相关方法
+  async addHistory(role: 'user' | 'assistant', content: string) {
+    const stmt = this.db.prepare(
+      'INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)'
+    );
+    stmt.run(role, content, Math.floor(Date.now() / 1000));
+  }
+
+  async getHistory() {
+    const stmt = this.db.prepare('SELECT role, content FROM chat_history ORDER BY id ASC');
+    return stmt.all() as { role: 'user' | 'assistant'; content: string }[];
+  }
+
+  async clearHistory() {
+    this.db.exec('DELETE FROM chat_history');
   }
 }
 
@@ -166,8 +210,11 @@ let storeInstance: SQLiteVectorStore | null = null;
 
 export const getVectorStore = async (): Promise<SQLiteVectorStore> => {
   if (storeInstance) return storeInstance;
+  console.log('[SQLite] 正在初始化向量存储...');
   const embeddings = await getEmbeddings();
+  console.log('[SQLite] Embeddings 就绪，正在加载数据库...');
   storeInstance = await SQLiteVectorStore.load(DB_PATH, embeddings);
+  console.log('[SQLite] 向量存储已加载。');
   return storeInstance;
 };
 
@@ -176,6 +223,21 @@ export const ingestDocs = async (docs: Document[]) => {
   const store = await getVectorStore();
   await store.addDocuments(docs);
   console.log('导入完成。');
+};
+
+export const addHistory = async (role: 'user' | 'assistant', content: string) => {
+  const store = await getVectorStore();
+  await store.addHistory(role, content);
+};
+
+export const getHistory = async () => {
+  const store = await getVectorStore();
+  return store.getHistory();
+};
+
+export const clearHistory = async () => {
+  const store = await getVectorStore();
+  await store.clearHistory();
 };
 
 export const getRetriever = async () => {
