@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHistory: () => ipcRenderer.invoke('get-history'),
   addHistory: (role, content) => ipcRenderer.invoke('add-history', role, content),
   clearHistory: () => ipcRenderer.invoke('clear-history'),
+  stopGeneration: () => ipcRenderer.invoke('stop-generation'),
 
   // 事件监听
   onAnswerStart: (callback) => {

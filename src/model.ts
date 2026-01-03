@@ -19,17 +19,17 @@ export const getEmbeddings = async (): Promise<Embeddings> => {
 
       // 配置 HuggingFace 国内镜像
       env.allowLocalModels = false;
-      env.useBrowserCache = false; // Disable browser cache in Node.js
+      env.useBrowserCache = false; // 在 Node.js 中禁用浏览器缓存
       env.remoteHost = 'https://hf-mirror.com';
       // env.remotePathTemplate = '{model}/resolve/{revision}/{file}';
-      console.log('[Model] HF Mirror configured: https://hf-mirror.com');
+      console.log('[Model] HF 镜像已配置: https://hf-mirror.com');
 
       // 注意: 底层 transformers 库会显示 "dtype not specified" 警告，这是正常的（使用 CPU 默认 fp32）
-      console.log('[Model] Instantiating HuggingFaceTransformersEmbeddings...');
+      console.log('[Model] 正在实例化 HuggingFaceTransformersEmbeddings...');
       embeddingInstance = new HuggingFaceTransformersEmbeddings({
         model: 'Xenova/all-MiniLM-L6-v2',
       });
-      console.log('[Model] Embeddings instantiated successfully.');
+      console.log('[Model] Embeddings 实例化成功。');
     } catch (e) {
       console.error(
         '加载 Embeddings 失败。请确保已安装 @langchain/community 和 @huggingface/transformers。'

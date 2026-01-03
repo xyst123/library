@@ -5,23 +5,7 @@ import type { Document } from '@langchain/core/documents';
 import { getLLM } from './model';
 import { getVectorStore } from './sqliteStore';
 import type { LLMProvider } from './config';
-
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-
-
-const formatHistory = (history: ChatMessage[]): string => {
-  return history
-    .map((msg) => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
-    .join('\n');
-};
-
-const formatDocumentsAsString = (documents: Document[]): string => {
-  return documents.map((doc) => doc.pageContent).join('\n\n');
-};
+import { ChatMessage, formatHistory, formatDocumentsAsString } from './utils';
 
 
 
@@ -37,7 +21,8 @@ export interface RagStreamResult {
 export const askQuestionStream = async (
   question: string,
   history: ChatMessage[],
-  provider: LLMProvider
+  provider: LLMProvider,
+  signal?: AbortSignal
 ): Promise<RagStreamResult> => {
   console.log(`正在提问 (流式): "${question}" (Provider: ${provider})`);
 
@@ -81,11 +66,14 @@ export const askQuestionStream = async (
   const chain = RunnableSequence.from([prompt, llm, new StringOutputParser()]);
 
   console.log('正在开始流式生成...');
-  const stream = await chain.stream({
-    context,
-    chat_history: chatHistory,
-    question,
-  });
+  const stream = await chain.stream(
+    {
+      context,
+      chat_history: chatHistory,
+      question,
+    },
+    { signal }
+  );
 
   return {
     stream,

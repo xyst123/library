@@ -241,6 +241,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleStop = async () => {
+    if (!window.electronAPI) return;
+    try {
+      await window.electronAPI.stopGeneration();
+      setLoading(false);
+      message.info('已停止生成');
+    } catch (error) {
+      console.error('停止失败:', error);
+    }
+  };
+
   return (
     <Layout className="tech-layout-bg" style={{ height: '100vh' }}>
       {/* 顶部栏 */}
@@ -283,7 +294,7 @@ const App: React.FC = () => {
         </Space>
       </Header>
 
-      <Layout>
+      <Layout className="tech-layout-bg">
         {/* 左侧边栏 - 文件列表 */}
         <Sider
           width={280}
@@ -415,6 +426,7 @@ const App: React.FC = () => {
 
         {/* 主内容区 - 聊天 */}
         <Content
+          className="tech-content"
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -422,8 +434,6 @@ const App: React.FC = () => {
             position: 'relative',
           }}
         >
-
-
           <div
             style={{
               flex: 1,
@@ -536,11 +546,13 @@ const App: React.FC = () => {
           {/* 输入区域 */}
           <div style={{ padding: '0 16px' }}>
             <Sender
+              className="tech-sender"
               value={input}
               onChange={setInput}
               onSubmit={() => {
                 handleSend();
               }}
+              onCancel={handleStop}
               loading={loading}
               placeholder="输入你的问题，按 Enter 发送..."
               style={{ width: '100%' }}

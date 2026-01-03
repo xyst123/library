@@ -34,8 +34,9 @@ declare global {
       ) => Promise<{ success: boolean; error?: string }>;
 
       clearHistory: () => Promise<{ success: boolean; error?: string }>;
+      stopGeneration: () => Promise<{ success: boolean; error?: string }>;
 
-      // Events
+      // 事件
       onAnswerStart: (
         callback: (
           event: unknown,

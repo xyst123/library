@@ -5,6 +5,7 @@ import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from
 import { askQuestionStream } from './rag';
 import { LLMProvider } from './config';
 import type { Document } from '@langchain/core/documents';
+import { ChatMessage } from './utils';
 
 type WorkerMessage =
   | { type: 'init' }
@@ -14,16 +15,18 @@ type WorkerMessage =
   | {
       type: 'ask-question';
       question: string;
-      history: { role: 'user' | 'assistant'; content: string }[];
+      history: ChatMessage[];
       provider: string;
     }
   | { type: 'get-status' }
   | { type: 'get-history' }
   | { type: 'add-history'; role: 'user' | 'assistant'; content: string }
   | { type: 'clear-history' }
-  | { type: 'ingest-progress'; current: number; total: number; status: string; file?: string };
+  | { type: 'ingest-progress'; current: number; total: number; status: string; file?: string }
+  | { type: 'stop-generation' };
 
 let isInitialized = false;
+let currentController: AbortController | null = null;
 
 async function initialize() {
   if (isInitialized) return;
@@ -104,12 +107,6 @@ parentPort.on('message', async (message: { id: string; data: WorkerMessage }) =>
       case 'delete-file': {
         const store = await getVectorStore();
         await store.deleteDocumentsBySource(data.filePath);
-        // Ensure atomic save/checkpoint if needed, sqlite-vss/better-sqlite3 usually auto-commits or handles WAL.
-        // The original code had store.save() which might be specific to HNSWLib,
-        // but for SQLiteVectorStore we implemented, check if we need explicit save.
-        // Checking sqliteStore.ts... it seems we migrated to SQLite, so explicit 'json save' is likely obsolete
-        // IF we fully switched. But let's check sqliteStore.ts content in a moment.
-        // Assuming SQLite persistence is automatic via SQL execution.
 
         const files = await store.getSources();
         result = { success: true, files };
@@ -117,53 +114,59 @@ parentPort.on('message', async (message: { id: string; data: WorkerMessage }) =>
       }
 
       case 'ask-question': {
+        // 取消之前的请求（如果有）
+        if (currentController) {
+          currentController.abort();
+        }
+        currentController = new AbortController();
+
         const llmProvider = data.provider === 'gemini' ? LLMProvider.GEMINI : LLMProvider.DEEPSEEK;
 
-        // 使用流式传输
-        const { stream, sources } = await askQuestionStream(
-          data.question,
-          data.history || [],
-          llmProvider
-        );
+        try {
+          // 使用流式传输
+          const { stream, sources } = await askQuestionStream(
+            data.question,
+            data.history || [],
+            llmProvider,
+            currentController.signal
+          );
 
-        // Send sources first (or with the first chunk, but here we can't send with first chunk easily in this structure)
-        // We will send a 'start' event or just send sources with the final result?
-        // Better: send 'answer-start' with sources, then 'answer-chunk', then 'answer-done'.
-        // BUT main.js expects a Promise resolve for 'ask-question'.
-        // Refactor: We need a way to emit events for a specific request ID.
-        // Current main.js 'sendToWorker' awaits a single response.
-        // We can keep 'ask-question' as is for non-streaming compatibility if we wanted,
-        // BUT we want streaming.
+          // 让我们直接遍历流并发送消息。
+          parentPort?.postMessage({ id, type: 'answer-start', sources });
 
-        // 策略:
-        // 1. 立即返回 success: true 以解决 Promise。
-        // 2. 通过 postMessage 流式传输 chunks。
+          let fullAnswer = '';
+          for await (const chunk of stream) {
+            fullAnswer += chunk;
+            parentPort?.postMessage({ id, type: 'answer-chunk', chunk });
+          }
 
-        // 临时方案: 我们使用相同的 ID 发送分块消息
-        // 用法: parentPort.postMessage({ type: 'answer-chunk', id, chunk: '...' })
-        // 但是 main.js 需要知道如何路由它们。
-
-        // 让我们修改流程:
-        // Worker 发送:
-        // { id, type: 'answer-start', sources }
-        // { id, type: 'answer-chunk', chunk }
-        // { id, success: true } (最终解决)
-
-        // 让我们直接遍历流并发送消息。
-        parentPort?.postMessage({ id, type: 'answer-start', sources });
-
-        let fullAnswer = '';
-        for await (const chunk of stream) {
-          fullAnswer += chunk;
-          parentPort?.postMessage({ id, type: 'answer-chunk', chunk });
+          // 最终用完整答案解析原始 Promise (用于回退或完成)
+          result = {
+            success: true,
+            answer: fullAnswer,
+            sources: sources,
+          };
+        } catch (error: unknown) {
+          // 检查是否是中止错误
+          if (currentController.signal.aborted) {
+             console.log('[Worker] 生成已停止');
+             result = { success: false, error: 'Aborted' };
+          } else {
+             throw error;
+          }
+        } finally {
+          currentController = null;
         }
+        break;
+      }
 
-        // 最终用完整答案解析原始 Promise (用于回退或完成)
-        result = {
-          success: true,
-          answer: fullAnswer,
-          sources: sources,
-        };
+      case 'stop-generation': {
+        if (currentController) {
+          currentController.abort();
+          currentController = null;
+          console.log('[Worker] 收到停止指令，已中止。');
+        }
+        result = { success: true };
         break;
       }
 

@@ -42,9 +42,9 @@ function createWorker() {
 
   worker.on('error', (err) => {
     console.error('Worker 错误:', err);
-    // Reject all pending requests
+    // 拒绝所有挂起的请求
     for (const { reject } of pendingRequests.values()) {
-      reject(new Error(`Worker error: ${err.message}`));
+      reject(new Error(`Worker 错误: ${err.message}`));
     }
     pendingRequests.clear();
   });
@@ -52,9 +52,9 @@ function createWorker() {
   worker.on('exit', (code) => {
     if (code !== 0) {
       console.error(new Error(`Worker 以退出码 ${code} 停止`));
-      // Reject all pending requests
+      // 拒绝所有挂起的请求
       for (const { reject } of pendingRequests.values()) {
-        reject(new Error(`Worker exited with code ${code}`));
+        reject(new Error(`Worker 以退出码 ${code} 退出`));
       }
       pendingRequests.clear();
     }
@@ -217,6 +217,21 @@ ipcMain.handle('clear-history', async () => {
   try {
     const result = await sendToWorker('clear-history');
     return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('stop-generation', async () => {
+  try {
+    // 发送停止信号给 Worker
+    // 我们不使用 sendToWorker 因为它期望响应/超时逻辑，而这里我们希望快速发送不等待
+    if (worker) {
+       worker.postMessage({ id: 'stop', data: { type: 'stop-generation' } });
+    }
+    // 同时清理任何匹配 'ask-question' 的挂起请求（如果可能）？
+    // 实际上 worker 在中止时会解决/拒绝挂起的 'ask-question' 请求。
+    return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
