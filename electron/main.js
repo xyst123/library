@@ -2,6 +2,13 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { Worker } = require('worker_threads');
+const { startMcpServer } = require('./mcp_server');
+
+// 重定向 console.log 到 console.error，避免干扰 MCP stdio 传输
+const originalConsoleLog = console.log;
+console.log = function(...args) {
+  console.error(...args);
+};
 
 let mainWindow = null;
 let worker = null;
@@ -110,6 +117,9 @@ app.whenReady().then(() => {
 
   // 初始化 Worker
   sendToWorker('init').catch((err) => console.error('Worker 初始化失败:', err));
+
+  // 启动 MCP 服务
+  startMcpServer(sendToWorker).catch((err) => console.error('MCP 服务启动失败:', err));
 });
 
 app.on('window-all-closed', () => {
