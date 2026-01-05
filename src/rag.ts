@@ -89,6 +89,11 @@ export const askQuestionStream = async (
 如果【上下文】中包含答案，请务必引用。
 如果【上下文】不相关或为空，请忽略上下文，使用你的**通用知识**进行回答。
 
+【特殊组件规则】
+如果用户询问天气相关问题，请在回答末尾添加天气组件标记（使用合理的估计数据）：
+<!-- COMPONENT:weather {{"city":"城市名","temp":温度数字,"condition":"天气状况","icon":"图标代码"}} -->
+图标代码可选: sunny(晴), cloudy(多云), rain(雨), snow(雪), thunder(雷), fog(雾), wind(风), partlyCloudy(少云)
+
 上下文:
 {context}
 

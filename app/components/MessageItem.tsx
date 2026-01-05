@@ -3,6 +3,7 @@ import { Card, Space, Typography } from 'antd';
 import { RobotOutlined, UserOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { parseContent, renderComponent } from './ComponentParser';
 import './MessageItem.css';
 
 const { Text } = Typography;
@@ -25,9 +26,34 @@ interface MessageItemProps {
 }
 
 /**
+ * 渲染助手消息内容
+ * 支持 Markdown 文本和自定义组件混合渲染
+ */
+const AssistantContent: React.FC<{ content: string }> = ({ content }) => {
+  const parsed = parseContent(content);
+
+  return (
+    <div className="assistant-content">
+      {parsed.map((item, idx) => {
+        if (item.type === 'component' && item.componentType && item.props) {
+          return renderComponent(item.componentType, item.props, idx);
+        }
+        return (
+          <div key={idx} className="markdown-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {item.content || ''}
+            </ReactMarkdown>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/**
  * 单条消息组件
  * 展示用户或助手的消息，包含参考来源
- * 助手消息支持 Markdown 渲染
+ * 助手消息支持 Markdown 和自定义组件渲染
  */
 const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   const isUser = message.role === 'user';
@@ -55,17 +81,13 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
           <Space align="start">
             {!isUser && <RobotOutlined style={{ color: '#00f3ff', fontSize: 16 }} />}
             
-            {/* 用户消息直接显示，助手消息使用 Markdown 渲染 */}
+            {/* 用户消息直接显示，助手消息使用混合渲染 */}
             {isUser ? (
               <Text style={{ color: '#fff', whiteSpace: 'pre-wrap' }}>
                 {message.content}
               </Text>
             ) : (
-              <div className="markdown-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content}
-                </ReactMarkdown>
-              </div>
+              <AssistantContent content={message.content} />
             )}
             
             {isUser && <UserOutlined style={{ color: '#fff', fontSize: 16 }} />}
@@ -107,3 +129,4 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
 
 export default MessageItem;
 export type { Message, MessageSource };
+
