@@ -13,8 +13,7 @@ console.log = function(...args) {
 let mainWindow = null;
 let worker = null;
 // 存储挂起请求的 Map: id -> { resolve, reject }
-// 存储挂起请求的 Map: id -> { resolve, reject }
-var pendingRequests = new Map();
+const pendingRequests = new Map();
 
 function createWorker() {
   const workerPath = path.join(__dirname, 'worker.js');
@@ -136,6 +135,25 @@ app.on('activate', () => {
 
 // IPC 处理器 代理到 Worker
 
+/**
+ * 创建通用 Worker 代理处理器
+ * @param {string} workerType - Worker 消息类型
+ * @param {function} [argsMapper] - 可选的参数映射函数
+ * @param {object} [defaultError] - 可选的默认错误返回值
+ */
+function createWorkerProxy(workerType, argsMapper = null, defaultError = null) {
+  return async (_event, ...args) => {
+    try {
+      const data = argsMapper ? argsMapper(...args) : (args[0] || {});
+      const result = await sendToWorker(workerType, data);
+      return result;
+    } catch (error) {
+      if (defaultError) return defaultError;
+      return { success: false, error: error.message };
+    }
+  };
+}
+
 // 选择文件 (仍然在主进程中运行，因为它打开本机对话框)
 ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -151,86 +169,17 @@ ipcMain.handle('select-files', async () => {
   return result.filePaths;
 });
 
-// 导入文件 (手动上传)
-ipcMain.handle('ingest-files', async (_event, filePaths) => {
-  try {
-    const result = await sendToWorker('ingest-files', { filePaths });
-    return result; // result is { success: true, files: [...] }
-  } catch (error) {
-    console.error('导入错误:', error);
-    return { success: false, error: error.message };
-  }
-});
+// 简单代理处理器
+ipcMain.handle('get-file-list', createWorkerProxy('get-file-list'));
+ipcMain.handle('get-history', createWorkerProxy('get-history'));
+ipcMain.handle('clear-history', createWorkerProxy('clear-history'));
+ipcMain.handle('get-status', createWorkerProxy('get-status', null, { documentCount: 0 }));
 
-// 获取文件列表
-ipcMain.handle('get-file-list', async () => {
-  try {
-    const result = await sendToWorker('get-file-list');
-    return result;
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// 删除文件
-ipcMain.handle('delete-file', async (_event, filePath) => {
-  try {
-    const result = await sendToWorker('delete-file', { filePath });
-    return result;
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// 获取状态
-ipcMain.handle('get-status', async () => {
-  try {
-    const result = await sendToWorker('get-status');
-    return result;
-  } catch (e) {
-    return { documentCount: 0 };
-  }
-});
-
-// 查询
-// 提问 (原 query)
-ipcMain.handle('ask-question', async (_event, question, history, provider) => {
-  try {
-    const result = await sendToWorker('ask-question', { question, history, provider });
-    return result;
-  } catch (error) {
-    console.error('提问错误:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-// 历史记录方法
-ipcMain.handle('get-history', async () => {
-  try {
-    const result = await sendToWorker('get-history');
-    return result;
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('add-history', async (_event, role, content) => {
-  try {
-    const result = await sendToWorker('add-history', { role, content });
-    return result;
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('clear-history', async () => {
-  try {
-    const result = await sendToWorker('clear-history');
-    return result;
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// 带参数映射的代理处理器
+ipcMain.handle('ingest-files', createWorkerProxy('ingest-files', (filePaths) => ({ filePaths })));
+ipcMain.handle('delete-file', createWorkerProxy('delete-file', (filePath) => ({ filePath })));
+ipcMain.handle('add-history', createWorkerProxy('add-history', (role, content) => ({ role, content })));
+ipcMain.handle('ask-question', createWorkerProxy('ask-question', (question, history, provider) => ({ question, history, provider })));
 
 ipcMain.handle('stop-generation', async () => {
   try {

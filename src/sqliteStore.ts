@@ -15,6 +15,7 @@ if (!fs.existsSync(DATA_DIR)) {
 
 export class SQLiteVectorStore extends VectorStore {
   private db: Database.Database;
+  private vectorDimension: number = 384; // 默认值，会在初始化时动态检测
 
   constructor(embeddings: Embeddings, dbPath: string) {
     super(embeddings, {});
@@ -32,7 +33,23 @@ export class SQLiteVectorStore extends VectorStore {
     sqlite_vss.load(this.db);
     console.log('[SQLite] sqlite-vss 已加载。');
 
+    // 动态检测向量维度
+    await this.detectVectorDimension();
+
     this.initDB();
+  }
+
+  /**
+   * 动态检测嵌入模型的向量维度
+   */
+  private async detectVectorDimension() {
+    try {
+      const testEmbedding = await this.embeddings.embedQuery('测试');
+      this.vectorDimension = testEmbedding.length;
+      console.log(`[SQLite] 检测到向量维度: ${this.vectorDimension}`);
+    } catch (e) {
+      console.warn('[SQLite] 无法检测向量维度，使用默认值 384');
+    }
   }
 
   _vectorstoreType(): string {
@@ -51,10 +68,10 @@ export class SQLiteVectorStore extends VectorStore {
     `);
 
     // 创建向量表 (vss0)
-    // 假设向量维度是 384 (all-MiniLM-L6-v2)
+    // 使用动态检测的向量维度
     this.db.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS vss_documents USING vss0(
-        vector(384)
+        vector(${this.vectorDimension})
       );
     `);
 

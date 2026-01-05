@@ -1,43 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import type React from 'react';
-import {
-  Layout,
-  Button,
-  Card,
-  Space,
-  Typography,
-  Select,
-  Spin,
-  message,
-  Empty,
-  Tooltip,
-  Popconfirm,
-} from 'antd';
+import { Layout, Button, Card, Space, Typography, Select, Spin, message, Empty, Popconfirm } from 'antd';
 import { Sender } from '@ant-design/x';
-import {
-  UploadOutlined,
-  FileTextOutlined,
-  DeleteOutlined,
-  RobotOutlined,
-  UserOutlined,
-  ReadOutlined,
-  ClearOutlined,
-} from '@ant-design/icons';
+import { ClearOutlined } from '@ant-design/icons';
+import { FileList, MessageItem } from './components';
+import type { Message } from './components';
 
 const { Header, Content, Sider } = Layout;
-const { Text, Title } = Typography;
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  sources?: Array<{
-    source: string;
-    content: string;
-    score?: number;
-  }>;
-}
+const { Text } = Typography;
 
 const App: React.FC = () => {
+  // 状态管理
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,16 +22,12 @@ const App: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  // 自动滚动
-
+  // 自动滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 刷新数据
   const refreshData = async () => {
     try {
       if (!window.electronAPI) return;
@@ -73,6 +42,7 @@ const App: React.FC = () => {
     }
   };
 
+  // 加载历史记录
   const loadHistory = async () => {
     if (!window.electronAPI) return;
     try {
@@ -85,11 +55,11 @@ const App: React.FC = () => {
     }
   };
 
+  // 初始化
   useEffect(() => {
     refreshData();
     loadHistory();
 
-    // 监听流式事件
     return () => {
       if (window.electronAPI) {
         window.electronAPI.removeListener('answer-start');
@@ -99,34 +69,44 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // 上传文件
   const handleUpload = async () => {
     if (!window.electronAPI) return;
 
     try {
       const filePaths = await window.electronAPI.selectFiles();
       if (filePaths && filePaths.length > 0) {
-        setUploading(true);
-        message.loading({ content: '正在索引文件...', key: 'uploading' });
-
-        const result = await window.electronAPI.ingestFiles(filePaths);
-
-        if (result.success) {
-          message.success({ content: `成功导入 ${filePaths.length} 个文件`, key: 'uploading' });
-          await refreshData();
-        } else {
-          message.error({ content: `导入失败: ${result.error}`, key: 'uploading' });
-        }
+        await ingestFiles(filePaths);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const err = error as any;
+    } catch (error: unknown) {
+      const err = error as Error;
       message.error(`操作失败: ${err.message}`);
+    }
+  };
+
+  // 导入文件（供拖放和上传共用）
+  const ingestFiles = async (paths: string[]) => {
+    if (!window.electronAPI) return;
+    setUploading(true);
+    message.loading({ content: '正在索引文件...', key: 'uploading' });
+
+    try {
+      const result = await window.electronAPI.ingestFiles(paths);
+      if (result.success) {
+        message.success({ content: `成功导入 ${paths.length} 个文件`, key: 'uploading' });
+        await refreshData();
+      } else {
+        message.error({ content: `导入失败: ${result.error}`, key: 'uploading' });
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      message.error(`导入发生错误: ${err.message}`);
     } finally {
       setUploading(false);
     }
   };
 
+  // 删除文件
   const handleDeleteFile = async (filePath: string) => {
     if (!window.electronAPI) return;
 
@@ -138,14 +118,13 @@ const App: React.FC = () => {
       } else {
         message.error(`删除失败: ${result.error}`);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const err = error as any;
+    } catch (error: unknown) {
+      const err = error as Error;
       message.error(`操作出错: ${err.message}`);
     }
   };
 
+  // 清空历史
   const handleClearHistory = async () => {
     if (!window.electronAPI) return;
     await window.electronAPI.clearHistory();
@@ -153,12 +132,12 @@ const App: React.FC = () => {
     message.success('对话历史已清空');
   };
 
+  // 发送消息
   const handleSend = async () => {
     if (!input.trim()) return;
 
     const question = input.trim();
     setInput('');
-    // 为用户提供乐观 UI
     const newMessages = [...messages, { role: 'user', content: question } as Message];
     setMessages(newMessages);
     setLoading(true);
@@ -166,7 +145,7 @@ const App: React.FC = () => {
     // 保存用户历史记录
     try {
       if (window.electronAPI) await window.electronAPI.addHistory('user', question);
-    } catch (e) {
+    } catch {
       /* 忽略 */
     }
 
@@ -174,12 +153,9 @@ const App: React.FC = () => {
     const assistantMsg: Message = { role: 'assistant', content: '' };
     setMessages((prev) => [...prev, assistantMsg]);
 
-    // 实际上，只要我们进行清理，就可以在这里注册一次性侦听器
-    // 但 React 严格模式可能会重复调用。
-    // 更好：使用 ref 跟踪我们是否正在流式传输并附加到当前消息。
-
     if (!window.electronAPI) return;
 
+    // 监听流式事件
     const handleAnswerStart = (_event: unknown, data: { sources: Message['sources'] }) => {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -190,8 +166,6 @@ const App: React.FC = () => {
       });
     };
 
-    // 监听回答片段
-    // handleSend 设置“正在接收”状态。
     const onChunk = (_event: unknown, msg: { chunk: string }) => {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -207,22 +181,16 @@ const App: React.FC = () => {
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
-
       const result = await window.electronAPI.askQuestion(question, history, provider);
 
       window.electronAPI.removeListener('answer-start');
       window.electronAPI.removeListener('answer-chunk');
 
       if (result.success) {
-        // 最终一致性检查 (确保保存完整答案)
-        // result.answer 包含全文。
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last.role === 'assistant') {
-            return [
-              ...prev.slice(0, -1),
-              { ...last, content: result.answer!, sources: result.sources },
-            ];
+            return [...prev.slice(0, -1), { ...last, content: result.answer!, sources: result.sources }];
           }
           return prev;
         });
@@ -230,7 +198,6 @@ const App: React.FC = () => {
         await window.electronAPI.addHistory('assistant', result.answer!);
       } else {
         message.error(`查询失败: ${result.error}`);
-        // 失败是否删除空的助手消息？或者显示错误。
       }
     } catch (error: unknown) {
       const err = error as Error;
@@ -241,6 +208,7 @@ const App: React.FC = () => {
     }
   };
 
+  // 停止生成
   const handleStop = async () => {
     if (!window.electronAPI) return;
     try {
@@ -252,23 +220,30 @@ const App: React.FC = () => {
     }
   };
 
+  // 处理拖放文件
+  const handleFilesDropped = async (paths: string[]) => {
+    if (paths.length === 0) {
+      message.warning('请拖入支持的文件 (.txt, .md, .pdf, .docx, .html)');
+      return;
+    }
+    await ingestFiles(paths);
+  };
+
   return (
     <Layout className="tech-layout-bg" style={{ height: '100vh' }}>
       {/* 顶部栏 */}
       <Header
         className="tech-header"
-        style={
-          {
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            WebkitAppRegion: 'drag',
-            zIndex: 10,
-          } as React.CSSProperties
-        }
+        style={{
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          WebkitAppRegion: 'drag',
+          zIndex: 10,
+        } as React.CSSProperties}
       >
-        <Space style={{ WebkitAppRegion: 'no-drag', marginLeft:'auto' } as React.CSSProperties}>
+        <Space style={{ WebkitAppRegion: 'no-drag', marginLeft: 'auto' } as React.CSSProperties}>
           <Select
             value={provider}
             onChange={setProvider}
@@ -278,18 +253,11 @@ const App: React.FC = () => {
               { value: 'gemini', label: 'Gemini' },
             ]}
           />
-          <Text className="tech-text-primary" style={{ fontWeight: 'bold' }}>{documentCount} 文档块</Text>
-          <Popconfirm
-            title="确认清空对话历史？"
-            onConfirm={handleClearHistory}
-            okText="是"
-            cancelText="否"
-          >
-            <Button
-              type="text"
-              icon={<ClearOutlined style={{ color: '#a0a0a0' }} />}
-              title="清空历史"
-            />
+          <Text className="tech-text-primary" style={{ fontWeight: 'bold' }}>
+            {documentCount} 文档块
+          </Text>
+          <Popconfirm title="确认清空对话历史？" onConfirm={handleClearHistory} okText="是" cancelText="否">
+            <Button type="text" icon={<ClearOutlined style={{ color: '#a0a0a0' }} />} title="清空历史" />
           </Popconfirm>
         </Space>
       </Header>
@@ -301,127 +269,18 @@ const App: React.FC = () => {
           className="tech-sider"
           style={{
             overflow: 'auto',
-            height: 'calc(100vh - 64px)', // 头部高度为 64px
+            height: 'calc(100vh - 64px)',
           }}
         >
-          <div
-            style={{
-              padding: 16,
-              height: '100%',
-              backgroundColor: isDragging ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
-              transition: 'background-color 0.2s',
-              border: isDragging ? '2px dashed #00f3ff' : 'none',
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-            }}
-            onDrop={async (e) => {
-              e.preventDefault();
-              setIsDragging(false);
-
-              const files = Array.from(e.dataTransfer.files);
-              const validFiles = files.filter((f) => {
-                const ext = f.name.split('.').pop()?.toLowerCase();
-                return ['txt', 'md', 'pdf', 'docx', 'html'].includes(ext || '');
-              });
-
-              if (validFiles.length === 0) {
-                message.warning('请拖入支持的文件 (.txt, .md, .pdf, .docx, .html)');
-                return;
-              }
-
-              const paths = validFiles.map((f) => (f as unknown as { path: string }).path); // Electron 在 File 对象上暴露 'path' 属性
-
-              setUploading(true);
-              try {
-                const res = await window.electronAPI.ingestFiles(paths);
-                if (res.success) {
-                  message.success(`成功导入 ${paths.length} 个文件`);
-                  await refreshData();
-                } else {
-                  message.error('导入失败: ' + res.error);
-                }
-              } catch (error) {
-                console.error(error);
-                message.error('导入发生错误');
-              } finally {
-                setUploading(false);
-              }
-            }}
-          >
-
-            <Button
-              block
-              type="primary"
-              icon={<UploadOutlined />}
-              onClick={handleUpload}
-              loading={uploading}
-              style={{ marginBottom: 16 }}
-            >
-              上传文件
-            </Button>
-
-            <div style={{ marginBottom: 12 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                知识库列表 ({fileList.length})
-              </Text>
-            </div>
-
-            {fileList.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<Text style={{ color: '#666', fontSize: 12 }}>暂无文件</Text>}
-              />
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {fileList.map((item) => (
-                  <div
-                    key={item}
-                    style={{
-                      padding: '8px 0',
-                      borderBottom: '1px solid #2d2d44',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        overflow: 'hidden',
-                        flex: 1,
-                        marginRight: 8,
-                      }}
-                    >
-                      <FileTextOutlined
-                        style={{ color: '#a0a0a0', marginLeft: 8, marginRight: 8, flexShrink: 0 }}
-                      />
-                      <Tooltip title={item}>
-                        <Text style={{ color: '#e0e0e0', fontSize: 13 }} ellipsis>
-                          {item.split('/').pop()}
-                        </Text>
-                      </Tooltip>
-                    </div>
-                    <Tooltip title="删除">
-                      <Button
-                        type="text"
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleDeleteFile(item)}
-                      />
-                    </Tooltip>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <FileList
+            fileList={fileList}
+            uploading={uploading}
+            isDragging={isDragging}
+            onUpload={handleUpload}
+            onDelete={handleDeleteFile}
+            onDragStateChange={setIsDragging}
+            onFilesDropped={handleFilesDropped}
+          />
         </Sider>
 
         {/* 主内容区 - 聊天 */}
@@ -445,85 +304,13 @@ const App: React.FC = () => {
             {messages.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Text style={{ color: '#666' }}>在左侧上传文档，然后在这里开始提问</Text>
-                }
+                description={<Text style={{ color: '#666' }}>在左侧上传文档，然后在这里开始提问</Text>}
                 style={{ marginTop: 100 }}
               />
             ) : (
-              messages.map((msg, index) => (
-                <div
-                  key={index}
-                  style={{
-                    display: 'flex',
-                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    marginBottom: 12,
-                  }}
-                >
-                  <Card
-                    size="small"
-                      style={{
-                        maxWidth: '75%',
-                        background:
-                          msg.role === 'user'
-                            ? 'linear-gradient(135deg, #00f3ff 0%, #2563eb 100%)'
-                            : 'rgba(255, 255, 255, 0.05)',
-                        border: msg.role === 'user' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                        color: msg.role === 'user' ? '#000' : '#fff', 
-                      }}
-                  >
-                    <Space orientation="vertical" style={{ width: '100%' }}>
-                      <Space align="start">
-                        {msg.role === 'assistant' && (
-                          <RobotOutlined style={{ color: '#00f3ff', fontSize: 16 }} />
-                        )}
-                        <Text
-                          style={{
-                            color: '#fff',
-                            whiteSpace: 'pre-wrap',
-                          }}
-                        >
-                          {msg.content}
-                        </Text>
-                        {msg.role === 'user' && (
-                          <UserOutlined style={{ color: '#fff', fontSize: 16 }} />
-                        )}
-                      </Space>
-                      {msg.sources && msg.sources.length > 0 && (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            paddingTop: 8,
-                            borderTop: '1px solid rgba(255,255,255,0.1)',
-                          }}
-                        >
-                          <Text
-                            type="secondary"
-                            style={{ fontSize: 12, display: 'block', marginBottom: 4 }}
-                          >
-                            参考来源:
-                          </Text>
-                          <ul style={{ paddingLeft: 16, margin: 0 }}>
-                            {msg.sources.map((s, idx) => (
-                              <li key={idx}>
-                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-                                  {s.source.split('/').pop()}
-                                  {s.score && (
-                                    <span style={{ marginLeft: 4, opacity: 0.5 }}>
-                                      ({(1 - s.score).toFixed(2)})
-                                    </span>
-                                  )}
-                                </Text>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </Space>
-                  </Card>
-                </div>
-              ))
+              messages.map((msg, index) => <MessageItem key={index} message={msg} />)
             )}
+
             {loading && (
               <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                 <Card
