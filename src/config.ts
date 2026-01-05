@@ -63,7 +63,7 @@ export const RAG_CONFIG = {
   retrievalK: 4,
   /** 对话历史保留条数 */
   historyLimit: 6,
-  /** 相似度阈值 (距离，越小越相似，暂未启用) */
+  /** 相似度阈值 (向量距离，越小越相似，超过此值的结果会被过滤) */
   similarityThreshold: 0.5,
 };
 

@@ -59,7 +59,18 @@ export const askQuestionStream = async (
   // 1. 检索 (使用缓存的 embedding)
   const embeddings = await getQueryEmbedding(question);
   // 使用配置的检索数量
-  const results = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
+  const rawResults = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
+
+  // 2. 过滤低质量结果 (距离越小越相似)
+  const filteredResults = rawResults.filter(([_doc, distance]) => {
+    // 距离小于阈值才保留
+    return distance < RAG_CONFIG.similarityThreshold;
+  });
+
+  // 如果过滤后没有结果，使用原始结果的前 N 个 (至少保留一些上下文)
+  const results = filteredResults.length > 0 ? filteredResults : rawResults.slice(0, 2);
+  
+  console.log(`[RAG] 检索到 ${rawResults.length} 条，过滤后 ${results.length} 条`);
 
   const relevantDocs = results.map((d) => d[0]);
   const sources = results.map((d) => ({
@@ -94,7 +105,7 @@ export const askQuestionStream = async (
   const chain = RunnableSequence.from([prompt, llm, new StringOutputParser()]);
 
   console.log('正在开始流式生成...');
-  const stream = await chain.stream(
+  const rawStream = await chain.stream(
     {
       context,
       chat_history: chatHistory,
@@ -103,8 +114,19 @@ export const askQuestionStream = async (
     { signal }
   );
 
+  // 包装 stream，在完成时输出日志
+  async function* streamWithLog(): AsyncGenerator<string> {
+    try {
+      for await (const chunk of rawStream) {
+        yield chunk;
+      }
+    } finally {
+      console.log('流式生成完成');
+    }
+  }
+
   return {
-    stream,
+    stream: streamWithLog(),
     sources,
   };
 };
