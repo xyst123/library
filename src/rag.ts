@@ -4,9 +4,36 @@ import { RunnableSequence } from '@langchain/core/runnables';
 import type { Document } from '@langchain/core/documents';
 import { getLLM } from './model';
 import { getVectorStore } from './sqliteStore';
-import type { LLMProvider } from './config';
+import { LLMProvider, RAG_CONFIG } from './config';
 import { ChatMessage, formatHistory, formatDocumentsAsString } from './utils';
 
+// 简单的 embedding 缓存 (LRU 风格)
+const CACHE_SIZE = 50;
+const embeddingCache = new Map<string, number[]>();
+
+/**
+ * 获取查询的 embedding (带缓存)
+ */
+async function getQueryEmbedding(query: string): Promise<number[]> {
+  // 检查缓存
+  if (embeddingCache.has(query)) {
+    console.log('[RAG] 使用缓存的 embedding');
+    return embeddingCache.get(query)!;
+  }
+
+  // 计算新的 embedding
+  const store = await getVectorStore();
+  const embedding = await store.embeddings.embedQuery(query);
+
+  // 添加到缓存 (简单 LRU: 超过限制时删除最老的)
+  if (embeddingCache.size >= CACHE_SIZE) {
+    const firstKey = embeddingCache.keys().next().value;
+    if (firstKey) embeddingCache.delete(firstKey);
+  }
+  embeddingCache.set(query, embedding);
+
+  return embedding;
+}
 
 
 export interface RagStreamResult {
@@ -29,10 +56,10 @@ export const askQuestionStream = async (
   const llm = getLLM(provider);
   const store = await getVectorStore();
 
-  // 1. 检索
-  const embeddings = await store.embeddings.embedQuery(question);
-  // 直接获取前 4 个最相关的文档 (无 Reranker)
-  const results = await store.similaritySearchVectorWithScore(embeddings, 4);
+  // 1. 检索 (使用缓存的 embedding)
+  const embeddings = await getQueryEmbedding(question);
+  // 使用配置的检索数量
+  const results = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
 
   const relevantDocs = results.map((d) => d[0]);
   const sources = results.map((d) => ({
@@ -43,7 +70,8 @@ export const askQuestionStream = async (
 
   // 3. 构建 Prompt
   const context = formatDocumentsAsString(relevantDocs);
-  const chatHistory = formatHistory(history.slice(-6));
+  // 使用配置的历史记录限制
+  const chatHistory = formatHistory(history.slice(-RAG_CONFIG.historyLimit));
 
   const template = `你是本地知识库助手。你同时拥有通用知识。
 请优先根据以下【上下文】和【对话历史】来回答问题。

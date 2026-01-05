@@ -63,6 +63,17 @@ function createWorker() {
         reject(new Error(`Worker 以退出码 ${code} 退出`));
       }
       pendingRequests.clear();
+
+      // 自动重启 Worker (延迟 1 秒防止快速循环)
+      console.error('[Main] Worker 崩溃，1 秒后自动重启...');
+      setTimeout(() => {
+        console.error('[Main] 正在重启 Worker...');
+        createWorker();
+        // 重新初始化
+        sendToWorker('init').catch((e) => {
+          console.error('[Main] Worker 重新初始化失败:', e);
+        });
+      }, 1000);
     }
   });
 }

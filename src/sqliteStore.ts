@@ -2,12 +2,13 @@ import { VectorStore } from '@langchain/core/vectorstores';
 import type { Embeddings } from '@langchain/core/embeddings';
 import { Document } from '@langchain/core/documents';
 import Database from 'better-sqlite3';
-import path from 'node:path';
 import fs from 'node:fs';
 import { getEmbeddings } from './model';
+import { STORAGE_CONFIG } from './config';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = path.join(DATA_DIR, 'library.db');
+// 使用集中配置
+const DATA_DIR = STORAGE_CONFIG.dataDir;
+const DB_PATH = STORAGE_CONFIG.dbPath;
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -84,6 +85,12 @@ export class SQLiteVectorStore extends VectorStore {
         timestamp INTEGER DEFAULT (strftime('%s', 'now'))
       );
     `);
+
+    // 创建索引优化查询性能
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_documents_source ON documents(source);
+    `);
+    console.log('[SQLite] 数据库索引已创建');
   }
 
   async addDocuments(documents: Document[]): Promise<void> {

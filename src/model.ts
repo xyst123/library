@@ -1,7 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/huggingface_transformers';
-import { LLMProvider, getEnv } from './config';
+import { LLMProvider, LLM_CONFIG, EMBEDDING_CONFIG, getEnv } from './config';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Embeddings } from '@langchain/core/embeddings';
 
@@ -12,22 +12,20 @@ let embeddingInstance: Embeddings | null = null;
 
 export const getEmbeddings = async (): Promise<Embeddings> => {
   if (!embeddingInstance) {
-    console.log('正在初始化本地 Embeddings (Xenova/all-MiniLM-L6-v2)...');
+    console.log(`正在初始化本地 Embeddings (${EMBEDDING_CONFIG.model})...`);
     try {
       // 动态导入 ESM 模块
       const { env } = await import('@huggingface/transformers');
 
-      // 配置 HuggingFace 国内镜像
-      env.allowLocalModels = false;
+      // 配置 HuggingFace 镜像
+      env.allowLocalModels = EMBEDDING_CONFIG.allowLocalModels;
       env.useBrowserCache = false; // 在 Node.js 中禁用浏览器缓存
-      env.remoteHost = 'https://hf-mirror.com';
-      // env.remotePathTemplate = '{model}/resolve/{revision}/{file}';
-      console.log('[Model] HF 镜像已配置: https://hf-mirror.com');
+      env.remoteHost = EMBEDDING_CONFIG.remoteHost;
+      console.log(`[Model] HF 镜像已配置: ${EMBEDDING_CONFIG.remoteHost}`);
 
-      // 注意: 底层 transformers 库会显示 "dtype not specified" 警告，这是正常的（使用 CPU 默认 fp32）
       console.log('[Model] 正在实例化 HuggingFaceTransformersEmbeddings...');
       embeddingInstance = new HuggingFaceTransformersEmbeddings({
-        model: 'Xenova/all-MiniLM-L6-v2',
+        model: EMBEDDING_CONFIG.model,
       });
       console.log('[Model] Embeddings 实例化成功。');
     } catch (e) {
@@ -47,18 +45,18 @@ export const getLLM = (provider: LLMProvider): BaseChatModel => {
       return new ChatOpenAI({
         apiKey: getEnv('DEEPSEEK_API_KEY'),
         configuration: {
-          baseURL: 'https://api.deepseek.com',
+          baseURL: LLM_CONFIG.deepseek.baseURL,
         },
-        modelName: 'deepseek-chat',
-        temperature: 0.7,
+        modelName: LLM_CONFIG.deepseek.model,
+        temperature: LLM_CONFIG.deepseek.temperature,
       });
 
     case LLMProvider.GEMINI:
       console.log('使用 Google Gemini');
       return new ChatGoogleGenerativeAI({
         apiKey: getEnv('GOOGLE_API_KEY'),
-        model: 'gemini-pro',
-        maxOutputTokens: 2048,
+        model: LLM_CONFIG.gemini.model,
+        maxOutputTokens: LLM_CONFIG.gemini.maxOutputTokens,
       });
 
     default:
