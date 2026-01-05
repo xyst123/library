@@ -21,7 +21,7 @@ const COMPONENT_REGEX = /<!--\s*COMPONENT:(\w+)\s+(\{[^}]+\})\s*-->/g;
  * @param content 原始消息内容
  * @returns 解析后的内容数组
  */
-export function parseContent(content: string): ParsedContent[] {
+export const parseContent = (content: string): ParsedContent[] => {
   const results: ParsedContent[] = [];
   let lastIndex = 0;
 

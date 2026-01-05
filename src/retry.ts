@@ -66,15 +66,15 @@ export async function withRetry<T>(
 /**
  * 睡眠函数
  */
-function sleep(ms: number): Promise<void> {
+const sleep = (ms: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
+};
 
 /**
  * 判断是否为可重试的 LLM 错误
  * (网络错误、速率限制等)
  */
-export function isRetryableLLMError(error: Error): boolean {
+export const isRetryableLLMError = (error: Error): boolean => {
   const message = error.message.toLowerCase();
   return (
     message.includes('network') ||
@@ -86,4 +86,4 @@ export function isRetryableLLMError(error: Error): boolean {
     message.includes('econnreset') ||
     message.includes('enotfound')
   );
-}
+};

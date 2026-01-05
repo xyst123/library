@@ -15,7 +15,7 @@ let worker = null;
 // 存储挂起请求的 Map: id -> { resolve, reject }
 const pendingRequests = new Map();
 
-function createWorker() {
+const createWorker = () => {
   const workerPath = path.join(__dirname, 'worker.js');
   worker = new Worker(workerPath);
 
@@ -78,7 +78,7 @@ function createWorker() {
   });
 }
 
-function sendToWorker(type, data = {}) {
+const sendToWorker = (type, data = {}) => {
   return new Promise((resolve, reject) => {
     const id = Math.random().toString(36).substring(7);
     pendingRequests.set(id, { resolve, reject });
@@ -96,7 +96,7 @@ function sendToWorker(type, data = {}) {
   });
 }
 
-function createWindow() {
+const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
@@ -152,7 +152,7 @@ app.on('activate', () => {
  * @param {function} [argsMapper] - 可选的参数映射函数
  * @param {object} [defaultError] - 可选的默认错误返回值
  */
-function createWorkerProxy(workerType, argsMapper = null, defaultError = null) {
+const createWorkerProxy = (workerType, argsMapper = null, defaultError = null) => {
   return async (_event, ...args) => {
     try {
       const data = argsMapper ? argsMapper(...args) : (args[0] || {});

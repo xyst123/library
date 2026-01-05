@@ -14,7 +14,7 @@ const embeddingCache = new Map<string, number[]>();
 /**
  * 获取查询的 embedding (带缓存)
  */
-async function getQueryEmbedding(query: string): Promise<number[]> {
+const getQueryEmbedding = async (query: string): Promise<number[]> => {
   // 检查缓存
   if (embeddingCache.has(query)) {
     console.log('[RAG] 使用缓存的 embedding');
@@ -33,7 +33,7 @@ async function getQueryEmbedding(query: string): Promise<number[]> {
   embeddingCache.set(query, embedding);
 
   return embedding;
-}
+};
 
 
 export interface RagStreamResult {

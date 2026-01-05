@@ -9,17 +9,17 @@ const DEBUG = process.env.MCP_DEBUG === 'true';
  * 调试日志函数
  * @param  {...any} args - 日志参数
  */
-function debugLog(...args) {
+const debugLog = (...args) => {
   if (DEBUG) {
     console.error('[MCP Debug]', ...args);
   }
-}
+};
 
 /**
  * 启动 MCP 服务
  * @param {function} sendToWorker - 用于向 Worker 发送消息的函数
  */
-async function startMcpServer(sendToWorker) {
+const startMcpServer = async (sendToWorker) => {
   // 创建 MCP 服务器
   const server = new McpServer({
     name: "Library Knowledge Base",
