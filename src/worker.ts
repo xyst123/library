@@ -127,7 +127,7 @@ const handleAskQuestion: MessageHandler = async (data, ctx) => {
   const llmProvider = provider === 'gemini' ? LLMProvider.GEMINI : LLMProvider.DEEPSEEK;
 
   try {
-    const { stream, sources } = await askQuestionStream(
+    const { stream, sources, toolCalls } = await askQuestionStream(
       question,
       history || [],
       llmProvider,
@@ -142,7 +142,13 @@ const handleAskQuestion: MessageHandler = async (data, ctx) => {
       parentPort?.postMessage({ id: ctx.id, type: 'answer-chunk', chunk });
     }
 
-    return { success: true, answer: fullAnswer, sources };
+    // 流结束后发送工具调用事件（结构化数据）
+    if (toolCalls.length > 0) {
+      console.log('[Worker] 发送工具调用事件，共', toolCalls.length, '个');
+      parentPort?.postMessage({ id: ctx.id, type: 'tool-calls', toolCalls });
+    }
+
+    return { success: true, answer: fullAnswer, sources, toolCalls };
   } catch (error: unknown) {
     if (currentController.signal.aborted) {
       console.log('[Worker] 生成已停止');

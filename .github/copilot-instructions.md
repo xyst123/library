@@ -131,6 +131,57 @@ npm run format     # Prettier 格式化
 3. **流式输出**: LLM 响应使用流式传输，逐字显示
 4. **多格式支持**: 支持 PDF、DOCX、HTML、TXT、MD 格式文档
 5. **向量存储**: 使用 SQLite + sqlite-vss 实现本地向量搜索
+6. **Function Calling**: 使用 OpenAI Function Calling 实现天气卡片等交互组件
+   - 工具定义在 `src/rag.ts` 中使用 zod schema
+   - 通过 `bindTools()` 绑定到 LLM
+   - tool_calls 自动转换为 HTML 注释标记
+   - 前端 `ComponentParser` 解析标记并渲染组件
+
+## Function Calling 工作流程（最佳实践）
+
+1. **工具定义**（`src/rag.ts`）：使用 `DynamicStructuredTool` 定义工具，schema 使用 zod
+2. **绑定工具**：通过 `llm.bindTools([tool])` 启用 Function Calling
+3. **LLM 调用**：当用户提问触发工具时，LLM 返回 `tool_calls`（结构化 JSON）
+4. **收集工具调用**：RAG 系统收集 tool_calls 数据
+5. **结构化传递**：Worker 发送独立的 `tool-calls` 事件（**避免转换为字符串**）
+6. **前端接收**：App 监听 `tool-calls` 事件，直接使用结构化数据
+7. **组件渲染**：直接传递给组件，**无需正则解析**
+
+### 技术要点
+
+**❌ 旧方案（不推荐）**：
+```
+结构化 tool_calls → HTML 注释字符串 → 正则解析 → 结构化数据
+```
+
+**✅ 新方案（最佳实践）**：
+```
+结构化 tool_calls → 结构化事件传递 → 直接使用
+```
+
+### 代码示例
+
+### 代码示例
+
+```typescript
+// 1. 在 src/rag.ts 定义工具
+const myTool = new DynamicStructuredTool({
+  name: 'tool_name',
+  description: '工具描述',
+  schema: z.object({
+    param: z.string().describe('参数说明'),
+  }),
+  func: async ({ param }) => {
+    return `工具执行结果`;
+  },
+});
+
+// 2. 绑定工具
+const llm = baseLLM.bindTools([weatherCardTool, myTool]);
+
+// 3. 在 streamWithToolCalls 中检测 tool_call.function.name
+// 4. 在 app/components/ComponentParser.tsx 添加对应的组件渲染逻辑
+```
 
 ## AI 相关概念
 

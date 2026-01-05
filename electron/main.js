@@ -5,7 +5,6 @@ const { Worker } = require('worker_threads');
 const { startMcpServer } = require('./mcp_server');
 
 // 重定向 console.log 到 console.error，避免干扰 MCP stdio 传输
-const originalConsoleLog = console.log;
 console.log = function(...args) {
   console.error(...args);
 };
@@ -22,10 +21,9 @@ const createWorker = () => {
   worker.on('message', (message) => {
     const { id, success, data, error, type } = message;
 
-    // 处理流式事件和进度
-    if (type === 'answer-start' || type === 'answer-chunk' || type === 'ingest-progress') {
+    // 处理流式事件和进度（包括 tool-calls）
+    if (type === 'answer-start' || type === 'answer-chunk' || type === 'tool-calls' || type === 'ingest-progress') {
       // 直接转发给渲染器
-      // 我们需要知道哪个窗口发送了请求？或者只是广播到 mainWindow。
       if (mainWindow) {
         mainWindow.webContents.send(type, message);
       }

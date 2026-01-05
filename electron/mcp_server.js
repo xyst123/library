@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
@@ -270,6 +271,6 @@ const startMcpServer = async (sendToWorker) => {
   if (DEBUG) {
     console.error("[MCP Debug] 调试模式已开启 (设置 MCP_DEBUG=false 关闭)");
   }
-}
+};
 
-module.exports = { startMcpServer };
+export { startMcpServer };

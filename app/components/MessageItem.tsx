@@ -3,7 +3,7 @@ import { Card, Space, Typography } from 'antd';
 import { RobotOutlined, UserOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { parseContent, renderComponent } from './ComponentParser';
+import { renderComponent } from './ComponentParser';
 import './MessageItem.css';
 
 const { Text } = Typography;
@@ -14,10 +14,16 @@ interface MessageSource {
   score?: number;
 }
 
+interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   sources?: MessageSource[];
+  toolCalls?: ToolCall[];
 }
 
 interface MessageItemProps {
@@ -27,25 +33,25 @@ interface MessageItemProps {
 
 /**
  * 渲染助手消息内容
- * 支持 Markdown 文本和自定义组件混合渲染
+ * 支持 Markdown 文本和结构化工具调用（无需正则解析）
  */
-const AssistantContent: React.FC<{ content: string }> = ({ content }) => {
-  const parsed = parseContent(content);
-
+const AssistantContent: React.FC<{ content: string; toolCalls?: ToolCall[] }> = ({ 
+  content, 
+  toolCalls 
+}) => {
   return (
     <div className="assistant-content">
-      {parsed.map((item, idx) => {
-        if (item.type === 'component' && item.componentType && item.props) {
-          return renderComponent(item.componentType, item.props, idx);
-        }
-        return (
-          <div key={idx} className="markdown-content">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {item.content || ''}
-            </ReactMarkdown>
-          </div>
-        );
-      })}
+      {/* 渲染文本内容 */}
+      <div className="markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </div>
+      
+      {/* 渲染工具调用组件（直接使用结构化数据，不需要正则） */}
+      {toolCalls && toolCalls.map((toolCall, idx) => 
+        renderComponent(toolCall.name, toolCall.args, idx)
+      )}
     </div>
   );
 };
@@ -87,7 +93,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
                 {message.content}
               </Text>
             ) : (
-              <AssistantContent content={message.content} />
+              <AssistantContent content={message.content} toolCalls={message.toolCalls} />
             )}
             
             {isUser && <UserOutlined style={{ color: '#fff', fontSize: 16 }} />}
@@ -128,5 +134,5 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
 };
 
 export default MessageItem;
-export type { Message, MessageSource };
+export type { Message, MessageSource, ToolCall };
 

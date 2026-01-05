@@ -79,7 +79,7 @@ export const askQuestionStream = async (
   );
 
   // 包装流，添加完成日志
-  async function* streamWithLog(): AsyncGenerator<string> {
+  const streamWithLog = async function* (): AsyncGenerator<string> {
     try {
       for await (const chunk of rawStream) {
         yield chunk;  // 逐块产出
@@ -87,7 +87,7 @@ export const askQuestionStream = async (
     } finally {
       console.log('流式生成完成');
     }
-  }
+  };
 
   return { stream: streamWithLog(), sources };
 };
@@ -165,11 +165,11 @@ const handleSend = async () => {
 
 ```typescript
 // function* 定义生成器函数
-function* simpleGenerator() {
+const simpleGenerator = function* () {
   yield 1;  // 返回 1，暂停
   yield 2;  // 返回 2，暂停
   yield 3;  // 返回 3，暂停
-}
+};
 
 const gen = simpleGenerator();
 gen.next(); // { value: 1, done: false }
@@ -182,12 +182,12 @@ gen.next(); // { value: undefined, done: true }
 
 ```typescript
 // async function* 定义异步生成器
-async function* asyncGenerator() {
+const asyncGenerator = async function* () {
   for (let i = 0; i < 3; i++) {
     await delay(1000);
     yield i;
   }
-}
+};
 
 // for await...of 消费
 for await (const value of asyncGenerator()) {

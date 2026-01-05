@@ -46,10 +46,8 @@ const main = async () => {
       const { stream, sources } = await askQuestionStream(question, [], provider);
       console.log('\n--- 回答 ---\n');
       
-      let fullAnswer = '';
       for await (const chunk of stream) {
         process.stdout.write(chunk);
-        fullAnswer += chunk;
       }
       
       if (sources && sources.length > 0) {

@@ -110,7 +110,7 @@ const vectors = await embeddings.embedDocuments(texts);
 const CACHE_SIZE = 50;
 const embeddingCache = new Map<string, number[]>();
 
-async function getQueryEmbedding(query: string): Promise<number[]> {
+const getQueryEmbedding = async (query: string): Promise<number[]> => {
   // 检查缓存
   if (embeddingCache.has(query)) {
     console.log('[RAG] 使用缓存的 embedding');

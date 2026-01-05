@@ -4,17 +4,20 @@ import { Layout, Button, Card, Space, Typography, Select, Spin, message, Empty, 
 import { Sender } from '@ant-design/x';
 import { ClearOutlined } from '@ant-design/icons';
 import { FileList, MessageItem } from './components';
-import type { Message } from './components';
+import { useChat } from './hooks';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;
 
 const App: React.FC = () => {
-  // 状态管理
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  // 聊天相关（使用 useChat hook）
   const [provider, setProvider] = useState('deepseek');
+  const { messages, loading, sendMessage, clearHistory, loadHistory, stopGeneration } = useChat({
+    provider,
+  });
+  
+  // 其他状态
+  const [input, setInput] = useState('');
   const [documentCount, setDocumentCount] = useState(0);
   const [fileList, setFileList] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -42,19 +45,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 加载历史记录
-  const loadHistory = async () => {
-    if (!window.electronAPI) return;
-    try {
-      const res = await window.electronAPI.getHistory();
-      if (res.success && res.history) {
-        setMessages(res.history);
-      }
-    } catch (e) {
-      console.error('加载历史失败:', e);
-    }
-  };
-
   // 初始化
   useEffect(() => {
     refreshData();
@@ -62,12 +52,10 @@ const App: React.FC = () => {
 
     return () => {
       if (window.electronAPI) {
-        window.electronAPI.removeListener('answer-start');
-        window.electronAPI.removeListener('answer-chunk');
         window.electronAPI.removeListener('ingest-progress');
       }
     };
-  }, []);
+  }, [loadHistory]);
 
   // 上传文件
   const handleUpload = async () => {
@@ -124,100 +112,13 @@ const App: React.FC = () => {
     }
   };
 
-  // 清空历史
-  const handleClearHistory = async () => {
-    if (!window.electronAPI) return;
-    await window.electronAPI.clearHistory();
-    setMessages([]);
-    message.success('对话历史已清空');
-  };
-
   // 发送消息
   const handleSend = async () => {
     if (!input.trim()) return;
-
     const question = input.trim();
     setInput('');
-    const newMessages = [...messages, { role: 'user', content: question } as Message];
-    setMessages(newMessages);
-    setLoading(true);
-
-    // 保存用户历史记录
-    try {
-      if (window.electronAPI) await window.electronAPI.addHistory('user', question);
-    } catch {
-      /* 忽略 */
-    }
-
-    // 助手消息占位符
-    const assistantMsg: Message = { role: 'assistant', content: '' };
-    setMessages((prev) => [...prev, assistantMsg]);
-
-    if (!window.electronAPI) return;
-
-    // 监听流式事件
-    const handleAnswerStart = (_event: unknown, data: { sources: Message['sources'] }) => {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last.role === 'assistant') {
-          return [...prev.slice(0, -1), { ...last, sources: data.sources }];
-        }
-        return prev;
-      });
-    };
-
-    const onChunk = (_event: unknown, msg: { chunk: string }) => {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last.role === 'assistant') {
-          return [...prev.slice(0, -1), { ...last, content: last.content + msg.chunk }];
-        }
-        return prev;
-      });
-    };
-
-    window.electronAPI.onAnswerStart(handleAnswerStart);
-    window.electronAPI.onAnswerChunk(onChunk);
-
-    try {
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
-      const result = await window.electronAPI.askQuestion(question, history, provider);
-
-      window.electronAPI.removeListener('answer-start');
-      window.electronAPI.removeListener('answer-chunk');
-
-      if (result.success) {
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...last, content: result.answer!, sources: result.sources }];
-          }
-          return prev;
-        });
-
-        await window.electronAPI.addHistory('assistant', result.answer!);
-      } else {
-        message.error(`查询失败: ${result.error}`);
-      }
-    } catch (error: unknown) {
-      const err = error as Error;
-      message.error(`查询出错: ${err.message}`);
-    } finally {
-      setLoading(false);
-      refreshData();
-    }
-  };
-
-  // 停止生成
-  const handleStop = async () => {
-    if (!window.electronAPI) return;
-    try {
-      await window.electronAPI.stopGeneration();
-      setLoading(false);
-      message.info('已停止生成');
-    } catch (error) {
-      console.error('停止失败:', error);
-    }
+    await sendMessage(question);
+    await refreshData();
   };
 
   // 处理拖放文件
@@ -256,7 +157,7 @@ const App: React.FC = () => {
           <Text className="tech-text-primary" style={{ fontWeight: 'bold' }}>
             {documentCount} 文档块
           </Text>
-          <Popconfirm title="确认清空对话历史？" onConfirm={handleClearHistory} okText="是" cancelText="否">
+          <Popconfirm title="确认清空对话历史？" onConfirm={clearHistory} okText="是" cancelText="否">
             <Button type="text" icon={<ClearOutlined style={{ color: '#a0a0a0' }} />} title="清空历史" />
           </Popconfirm>
         </Space>
@@ -339,7 +240,7 @@ const App: React.FC = () => {
               onSubmit={() => {
                 handleSend();
               }}
-              onCancel={handleStop}
+              onCancel={stopGeneration}
               loading={loading}
               placeholder="输入你的问题，按 Enter 发送..."
               style={{ width: '100%' }}

@@ -9,6 +9,7 @@
 - 🤖 **多模型** - 支持 DeepSeek / Gemini 切换
 - 📄 **多格式** - 支持 PDF、DOCX、HTML、TXT、MD
 - ⚡ **流式输出** - 实时逐字显示 AI 回复
+- 🛠️ **Function Calling** - 基于 OpenAI Function Calling 的智能组件调用
 
 ## 🏗️ 技术架构
 

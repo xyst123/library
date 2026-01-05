@@ -44,6 +44,12 @@ declare global {
         ) => void
       ) => void;
       onAnswerChunk: (callback: (event: unknown, data: { chunk: string }) => void) => void;
+      onToolCalls: (
+        callback: (
+          event: unknown,
+          data: { toolCalls: Array<{ name: string; args: Record<string, unknown> }> }
+        ) => void
+      ) => void;
       onIngestProgress: (
         callback: (
           event: unknown,

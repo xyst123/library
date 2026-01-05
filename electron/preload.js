@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAnswerChunk: (callback) => {
     ipcRenderer.on('answer-chunk', callback);
   },
+  onToolCalls: (callback) => {
+    ipcRenderer.on('tool-calls', callback);
+  },
   onIngestProgress: (callback) => {
     ipcRenderer.on('ingest-progress', callback);
   },
