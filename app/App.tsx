@@ -15,6 +15,7 @@ import { Sender } from '@ant-design/x';
 import { ClearOutlined, SettingOutlined } from '@ant-design/icons';
 import { FileList, MessageItem, Settings } from './components';
 import { useChat } from './hooks';
+import { colors } from './theme/colors';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;
@@ -46,10 +47,9 @@ const AppContent: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 刷新数据
   const refreshData = async () => {
+    if (!window.electronAPI) return;
     try {
-      if (!window.electronAPI) return;
       const status = await window.electronAPI.getStatus();
       setDocumentCount(status.documentCount);
       const filesResult = await window.electronAPI.getFileList();
@@ -73,22 +73,18 @@ const AppContent: React.FC = () => {
     };
   }, [loadHistory]);
 
-  // 上传文件
   const handleUpload = async () => {
     if (!window.electronAPI) return;
-
     try {
       const filePaths = await window.electronAPI.selectFiles();
       if (filePaths && filePaths.length > 0) {
         await ingestFiles(filePaths);
       }
     } catch (error: unknown) {
-      const err = error as Error;
-      message.error(`操作失败: ${err.message}`);
+      message.error(`操作失败: ${(error as Error).message}`);
     }
   };
 
-  // 导入文件（供拖放和上传共用）
   const ingestFiles = async (paths: string[]) => {
     if (!window.electronAPI) return;
     setUploading(true);
@@ -96,35 +92,28 @@ const AppContent: React.FC = () => {
 
     try {
       const result = await window.electronAPI.ingestFiles(paths);
-      if (result.success) {
-        message.success({ content: `成功导入 ${paths.length} 个文件`, key: 'uploading' });
-        await refreshData();
-      } else {
-        message.error({ content: `导入失败: ${result.error}`, key: 'uploading' });
-      }
+      message[result.success ? 'success' : 'error']({
+        content: result.success ? `成功导入 ${paths.length} 个文件` : `导入失败: ${result.error}`,
+        key: 'uploading'
+      });
+      if (result.success) await refreshData();
     } catch (error: unknown) {
-      const err = error as Error;
-      message.error(`导入发生错误: ${err.message}`);
+      message.error(`导入发生错误: ${(error as Error).message}`);
     } finally {
       setUploading(false);
     }
   };
 
-  // 删除文件
   const handleDeleteFile = async (filePath: string) => {
     if (!window.electronAPI) return;
-
     try {
       const result = await window.electronAPI.deleteFile(filePath);
-      if (result.success) {
-        message.success('文件已删除并更新索引');
-        await refreshData();
-      } else {
-        message.error(`删除失败: ${result.error}`);
-      }
+      message[result.success ? 'success' : 'error'](
+        result.success ? '文件已删除并更新索引' : `删除失败: ${result.error}`
+      );
+      if (result.success) await refreshData();
     } catch (error: unknown) {
-      const err = error as Error;
-      message.error(`操作出错: ${err.message}`);
+      message.error(`操作出错: ${(error as Error).message}`);
     }
   };
 
@@ -163,7 +152,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // 处理拖放文件
   const handleFilesDropped = async (paths: string[]) => {
     if (paths.length === 0) {
       message.warning('请拖入支持的文件 (.txt, .md, .pdf, .docx, .html)');
@@ -197,8 +185,8 @@ const AppContent: React.FC = () => {
             style={{
               fontWeight: 'bold',
               fontSize: '14px',
-              color: '#1dd1f7',
-              textShadow: '0 0 10px rgba(29, 209, 247, 0.3)',
+              color: colors.primary,
+              textShadow: colors.shadow.primary,
             }}
           >
             {documentCount} 文档块
@@ -214,19 +202,23 @@ const AppContent: React.FC = () => {
               icon={<ClearOutlined />}
               title="清空历史"
               style={{
-                color: '#a0a0a0',
+                color: colors.text.secondary,
                 fontSize: '16px',
                 transition: 'all 0.3s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#ff4d4f';
-                e.currentTarget.style.background = 'rgba(255, 77, 79, 0.1)';
-                e.currentTarget.style.transform = 'scale(1.1)';
+                Object.assign(e.currentTarget.style, {
+                  color: colors.danger,
+                  background: colors.background.hover.danger,
+                  transform: 'scale(1.1)',
+                });
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#a0a0a0';
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.transform = 'scale(1)';
+                Object.assign(e.currentTarget.style, {
+                  color: colors.text.secondary,
+                  background: colors.background.transparent,
+                  transform: 'scale(1)',
+                });
               }}
             />
           </Popconfirm>
@@ -236,19 +228,23 @@ const AppContent: React.FC = () => {
             title="设置"
             onClick={() => setSettingsVisible(true)}
             style={{
-              color: '#a0a0a0',
+              color: colors.text.secondary,
               fontSize: '16px',
               transition: 'all 0.3s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#1dd1f7';
-              e.currentTarget.style.background = 'rgba(29, 209, 247, 0.1)';
-              e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+              Object.assign(e.currentTarget.style, {
+                color: colors.primary,
+                background: colors.background.hover.primary,
+                transform: 'rotate(90deg) scale(1.1)',
+              });
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#a0a0a0';
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+              Object.assign(e.currentTarget.style, {
+                color: colors.text.secondary,
+                background: colors.background.transparent,
+                transform: 'rotate(0deg) scale(1)',
+              });
             }}
           />
         </Space>
@@ -297,7 +293,7 @@ const AppContent: React.FC = () => {
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
-                  <Text style={{ color: '#666' }}>在左侧上传文档，然后在这里开始提问</Text>
+                  <Text style={{ color: colors.text.muted }}>在左侧上传文档，然后在这里开始提问</Text>
                 }
                 style={{ marginTop: 100 }}
               />
@@ -310,13 +306,13 @@ const AppContent: React.FC = () => {
                 <Card
                   size="small"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: colors.background.overlay,
+                    border: `1px solid ${colors.border.light}`,
                   }}
                 >
                   <Space>
                     <Spin size="small" />
-                    <Text style={{ color: '#a0a0a0' }}>思考中...</Text>
+                    <Text style={{ color: colors.text.secondary }}>思考中...</Text>
                   </Space>
                 </Card>
               </div>

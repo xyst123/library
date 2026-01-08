@@ -16,23 +16,18 @@ const embeddingCache = new Map<string, number[]>();
  * 获取查询的 embedding (带缓存)
  */
 const getQueryEmbedding = async (query: string): Promise<number[]> => {
-  // 检查缓存
   if (embeddingCache.has(query)) {
     console.log('[RAG] 使用缓存的 embedding');
     return embeddingCache.get(query)!;
   }
 
-  // 计算新的 embedding
   const store = await getVectorStore();
   const embedding = await store.embeddings.embedQuery(query);
 
-  // 添加到缓存 (简单 LRU: 超过限制时删除最老的)
   if (embeddingCache.size >= CACHE_SIZE) {
-    const firstKey = embeddingCache.keys().next().value;
-    if (firstKey) embeddingCache.delete(firstKey);
+    embeddingCache.delete(embeddingCache.keys().next().value!);
   }
   embeddingCache.set(query, embedding);
-
   return embedding;
 };
 
@@ -51,30 +46,25 @@ const reciprocalRankFusion = (
 ): [Document, number][] => {
   const topK = listsAndParams.pop() as number;
   const lists = listsAndParams as Array<[Document, number][]>;
-  const k = 60; // RRF 常数
-
-  // 使用文档内容作为唯一标识（metadata 可能不同）
   const scoreMap = new Map<string, { doc: Document; score: number }>();
 
   lists.forEach((list) => {
-    list.forEach(([doc, _originalScore], rank) => {
-      const key = doc.pageContent; // 使用内容作为去重 key
-      const rrfScore = 1 / (k + rank + 1); // RRF 公式
-
-      if (scoreMap.has(key)) {
-        // 累加分数
-        scoreMap.get(key)!.score += rrfScore;
-      } else {
-        scoreMap.set(key, { doc, score: rrfScore });
-      }
+    list.forEach(([doc, _], rank) => {
+      const key = doc.pageContent;
+      const rrfScore = 1 / (60 + rank + 1);
+      const existing = scoreMap.get(key);
+      
+      scoreMap.set(key, existing 
+        ? { ...existing, score: existing.score + rrfScore }
+        : { doc, score: rrfScore }
+      );
     });
   });
 
-  // 按融合分数降序排序，取前 topK
   return Array.from(scoreMap.values())
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
-    .map((item) => [item.doc, item.score]);
+    .map(({ doc, score }) => [doc, score]);
 };
 
 // ============ Function Calling 工具定义 ============
@@ -128,37 +118,23 @@ export const askQuestionStream = async (
   const llm = baseLLM.bindTools ? baseLLM.bindTools([weatherCardTool]) : baseLLM;
   const store = await getVectorStore();
 
-  // 1. 检索逻辑（根据配置选择策略）
+  // 1. 检索逻辑
+  const embeddings = await getQueryEmbedding(question);
   let finalResults: [Document, number][];
 
   if (RAG_CONFIG.enableHybridSearch) {
     console.log('[RAG] 使用混合检索（向量 + BM25）');
-    
-    // 并行执行向量检索和 BM25 检索
-    const embeddings = await getQueryEmbedding(question);
+    const k = RAG_CONFIG.retrievalK;
     const [vectorResults, bm25Results] = await Promise.all([
-      store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK * 2),
-      store.bm25Search(question, RAG_CONFIG.retrievalK * 2),
+      store.similaritySearchVectorWithScore(embeddings, k * 2),
+      store.bm25Search(question, k * 2),
     ]);
-
-    console.log(`[RAG] 向量检索: ${vectorResults.length} 个结果`);
-    console.log(`[RAG] BM25 检索: ${bm25Results.length} 个结果`);
-
-    // 使用 RRF 算法融合结果
-    finalResults = reciprocalRankFusion(vectorResults, bm25Results, RAG_CONFIG.retrievalK);
-    console.log(`[RAG] RRF 融合后: ${finalResults.length} 个结果`);
+    console.log(`[RAG] 向量: ${vectorResults.length}, BM25: ${bm25Results.length}`);
+    finalResults = reciprocalRankFusion(vectorResults, bm25Results, k);
   } else {
     console.log('[RAG] 使用纯向量检索');
-    // 原有的纯向量检索逻辑
-    const embeddings = await getQueryEmbedding(question);
     const rawResults = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
-
-    // 2. 过滤低质量结果 (距离越小越相似)
-    const filteredResults = rawResults.filter(([_doc, distance]) => {
-      return distance < RAG_CONFIG.similarityThreshold;
-    });
-
-    // 如果过滤后没有结果，使用原始结果的前 N 个
+    const filteredResults = rawResults.filter(([, distance]) => distance < RAG_CONFIG.similarityThreshold);
     finalResults = filteredResults.length > 0 ? filteredResults : rawResults.slice(0, RAG_CONFIG.retrievalK);
   }
 
@@ -167,7 +143,7 @@ export const askQuestionStream = async (
   const sources = finalResults.map(([doc, score]) => ({
     source: doc.metadata.source,
     content: doc.pageContent,
-    score: score, // 向量距离或融合分数
+    score,
   }));
 
   // 3. 构建 Prompt
@@ -237,15 +213,12 @@ export const askQuestionStream = async (
         
         // 输出文本内容
         if (chunk.content) {
-          // 处理不同类型的 content
           const content = typeof chunk.content === 'string' 
             ? chunk.content 
             : Array.isArray(chunk.content) 
               ? chunk.content.map(c => typeof c === 'string' ? c : (c as { text?: string }).text || '').join('')
               : '';
-          if (content) {
-            yield content;
-          }
+          if (content) yield content;
         }
       }
     } finally {

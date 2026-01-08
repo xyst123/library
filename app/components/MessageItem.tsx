@@ -4,6 +4,7 @@ import { RobotOutlined, UserOutlined, CopyOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { renderComponent } from './ComponentParser';
+import { colors } from '../theme/colors';
 import './MessageItem.css';
 
 const { Text } = Typography;
@@ -31,30 +32,21 @@ interface MessageItemProps {
   message: Message;
 }
 
-/**
- * 渲染助手消息内容
- * 支持 Markdown 文本和结构化工具调用（无需正则解析）
- */
 const AssistantContent: React.FC<{ content: string; toolCalls?: ToolCall[] }> = ({ 
   content, 
   toolCalls 
-}) => {
-  return (
-    <div className="assistant-content">
-      {/* 渲染文本内容 */}
-      <div className="markdown-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {content}
-        </ReactMarkdown>
-      </div>
-      
-      {/* 渲染工具调用组件（直接使用结构化数据，不需要正则） */}
-      {toolCalls && toolCalls.map((toolCall, idx) => 
-        renderComponent(toolCall.name, toolCall.args, idx)
-      )}
+}) => (
+  <div className="assistant-content">
+    <div className="markdown-content">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {content}
+      </ReactMarkdown>
     </div>
-  );
-};
+    {toolCalls?.map((toolCall, idx) => 
+      renderComponent(toolCall.name, toolCall.args, idx)
+    )}
+  </div>
+);
 
 /**
  * 单条消息组件
@@ -64,13 +56,10 @@ const AssistantContent: React.FC<{ content: string; toolCalls?: ToolCall[] }> = 
 const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   const isUser = message.role === 'user';
 
-  // 复制消息内容
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content).then(() => {
-      antdMessage.success('已复制到剪贴板');
-    }).catch(() => {
-      antdMessage.error('复制失败');
-    });
+    navigator.clipboard.writeText(message.content)
+      .then(() => antdMessage.success('已复制到剪贴板'))
+      .catch(() => antdMessage.error('复制失败'));
   };
 
   return (
@@ -133,7 +122,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
                     <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
                       分块 {idx + 1}: {s.source.split('/').pop()}
                       {s.score && (
-                        <span style={{ marginLeft: 8, color: '#1dd1f7' }}>
+                        <span style={{ marginLeft: 8, color: colors.primary }}>
                           相似度: {(1 - s.score).toFixed(3)}
                         </span>
                       )}

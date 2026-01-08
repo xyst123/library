@@ -47,7 +47,6 @@ export const Settings: React.FC<SettingsProps> = ({
   const handleOk = async () => {
     setLoading(true);
     try {
-      // 保存设置
       if (window.electronAPI) {
         await window.electronAPI.saveSettings({
           provider,

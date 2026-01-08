@@ -55,11 +55,8 @@ const FileList: React.FC<FileListProps> = ({
       return ['txt', 'md', 'pdf', 'docx', 'html'].includes(ext || '');
     });
 
-    if (validFiles.length === 0) {
-      return; // 父组件会处理警告提示
-    }
+    if (validFiles.length === 0) return;
 
-    // Electron 在 File 对象上暴露 'path' 属性
     const paths = validFiles.map((f) => (f as unknown as { path: string }).path);
     onFilesDropped(paths);
   };

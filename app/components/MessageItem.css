@@ -1,6 +1,6 @@
 /* MessageItem Markdown 样式 */
 .markdown-content {
-  color: #fff;
+  color: var(--color-text-primary, #fff);
   line-height: 1.6;
 }
 
@@ -13,7 +13,7 @@
 }
 
 .markdown-content code {
-  background: rgba(0, 243, 255, 0.1);
+  background: var(--color-bg-code, rgba(0, 243, 255, 0.1));
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
@@ -21,7 +21,7 @@
 }
 
 .markdown-content pre {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-dark, rgba(0, 0, 0, 0.3));
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
@@ -44,7 +44,7 @@
 }
 
 .markdown-content blockquote {
-  border-left: 3px solid #1dd1f7;
+  border-left: 3px solid var(--color-primary, #1dd1f7);
   padding-left: 12px;
   margin: 8px 0;
   opacity: 0.8;

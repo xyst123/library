@@ -40,15 +40,11 @@ export class SQLiteVectorStore extends VectorStore {
     this.initDB();
   }
 
-  /**
-   * 动态检测嵌入模型的向量维度
-   */
   private async detectVectorDimension() {
     try {
-      const testEmbedding = await this.embeddings.embedQuery('测试');
-      this.vectorDimension = testEmbedding.length;
+      this.vectorDimension = (await this.embeddings.embedQuery('测试')).length;
       console.log(`[SQLite] 检测到向量维度: ${this.vectorDimension}`);
-    } catch (e) {
+    } catch {
       console.warn('[SQLite] 无法检测向量维度，使用默认值 384');
     }
   }

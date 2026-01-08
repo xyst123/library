@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Card, Space, Typography } from 'antd';
+import { colors } from '../theme/colors';
 import './WeatherCard.css';
 
 const { Text, Title } = Typography;
@@ -37,7 +38,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ city, temp, condition, icon }
           <Text type="secondary" style={{ fontSize: 12 }}>
             {city}
           </Text>
-          <Title level={3} style={{ margin: 0, color: '#fff' }}>
+          <Title level={3} style={{ margin: 0, color: colors.text.primary }}>
             {temp}°C
           </Title>
           <Text style={{ color: 'rgba(255,255,255,0.8)' }}>{condition}</Text>
