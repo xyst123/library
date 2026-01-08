@@ -59,8 +59,8 @@ export const STORAGE_CONFIG = {
 
 /** Chunking 策略枚举 */
 export enum ChunkingStrategy {
-  CHARACTER = 'character',  // 字符递归分割
-  SEMANTIC = 'semantic',    // 语义分割
+  CHARACTER = 'character', // 字符递归分割
+  SEMANTIC = 'semantic', // 语义分割
 }
 
 /** Chunking 相关配置 */
@@ -91,11 +91,21 @@ export const RAG_CONFIG = {
   /** 对话历史保留条数 */
   historyLimit: 6,
   /** 相似度阈值 (向量距离，越小越相似，超过此值的结果会被过滤) */
-  similarityThreshold: 0.5,
+  similarityThreshold: 1.5,
   /** 是否启用混合检索（向量 + BM25） */
   enableHybridSearch: false,
   /** 混合检索中 BM25 的权重（0-1，向量权重为 1-bm25Weight） */
   bm25Weight: 0.5,
+  /** 是否启用重排序 (Reranking) */
+  enableReranking: false,
+};
+
+/** Reranking 模型配置 */
+export const RERANKING_CONFIG = {
+  /** Reranking 模型名称 */
+  model: 'Xenova/bge-reranker-base',
+  /** 返回 Top N 个结果给 LLM */
+  topN: 4,
 };
 
 // ============ 工具函数 ============

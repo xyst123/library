@@ -6,11 +6,20 @@ import { SettingOutlined } from '@ant-design/icons';
 const { Text } = Typography;
 const { Option } = Select;
 
+interface SettingsData {
+  provider?: string;
+  chunkingStrategy?: string;
+  enableContextEnhancement?: boolean;
+  enableHybridSearch?: boolean;
+  enableReranking?: boolean;
+}
+
 interface SettingsProps {
   visible: boolean;
   onClose: () => void;
   provider: string;
   onProviderChange: (provider: string) => void;
+  onSettingsChange?: (settings: SettingsData) => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -18,10 +27,12 @@ export const Settings: React.FC<SettingsProps> = ({
   onClose,
   provider,
   onProviderChange,
+  onSettingsChange,
 }) => {
   const [chunkingStrategy, setChunkingStrategy] = useState<string>('character');
   const [enableContextEnhancement, setEnableContextEnhancement] = useState<boolean>(true);
   const [enableHybridSearch, setEnableHybridSearch] = useState<boolean>(false);
+  const [enableReranking, setEnableReranking] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
 
   // 加载当前配置
@@ -42,6 +53,7 @@ export const Settings: React.FC<SettingsProps> = ({
         setChunkingStrategy(settings.chunkingStrategy || 'character');
         setEnableContextEnhancement(settings.enableContextEnhancement ?? true);
         setEnableHybridSearch(settings.enableHybridSearch ?? false);
+        setEnableReranking(settings.enableReranking ?? false);
       }
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -49,24 +61,19 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleOk = async () => {
+    if (!window.electronAPI) return;
     setLoading(true);
+    const settings = {
+      provider,
+      chunkingStrategy,
+      enableContextEnhancement,
+      enableHybridSearch,
+      enableReranking,
+    };
     try {
-      if (!window.electronAPI) {
-        console.error('electronAPI 未定义');
-        return;
-      }
-      await window.electronAPI.saveSettings({
-        provider,
-        chunkingStrategy,
-        enableContextEnhancement,
-        enableHybridSearch,
-      });
-      console.log('设置已保存:', {
-        provider,
-        chunkingStrategy,
-        enableContextEnhancement,
-        enableHybridSearch,
-      });
+      await window.electronAPI.saveSettings(settings);
+      console.log('设置已保存:', settings);
+      onSettingsChange?.(settings);
       onClose();
     } catch (error) {
       console.error('保存设置失败:', error);
@@ -221,6 +228,42 @@ export const Settings: React.FC<SettingsProps> = ({
                   </Text>
                   <Text type="warning" style={{ fontSize: '12px' }}>
                     💡 适合专有名词、代码、精确匹配等场景
+                  </Text>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Divider />
+
+        {/* 重排序开关 */}
+        <Form.Item
+          label="重排序 (Reranking)"
+          extra={
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              使用 Cross-Encoder 模型对检索结果进行二次精排，显著提升相关性
+            </Text>
+          }
+        >
+          <Radio.Group value={enableReranking} onChange={(e) => setEnableReranking(e.target.value)}>
+            <Space orientation="vertical">
+              <Radio value={true}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>启用 (推荐)</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    对检索结果进行语义打分，减少“幻觉”
+                  </Text>
+                  <Text type="warning" style={{ fontSize: '12px' }}>
+                    ⚠️ 会增加额外的计算耗时，首次运行需下载模型
+                  </Text>
+                </Space>
+              </Radio>
+              <Radio value={false}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>禁用</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    速度最快，仅依赖初始检索结果
                   </Text>
                 </Space>
               </Radio>

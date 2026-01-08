@@ -59,6 +59,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.3.0",
     "@commitlint/config-conventional": "^20.3.0",
+    "@electron/rebuild": "^4.0.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
@@ -108,7 +109,8 @@
     "asarUnpack": [
       "**/node_modules/sharp/**/*",
       "**/node_modules/better-sqlite3/**/*",
-      "**/node_modules/sqlite-vss/**/*"
+      "**/node_modules/sqlite-vss/**/*",
+      "**/node_modules/onnxruntime-node/**/*"
     ]
   }
 }

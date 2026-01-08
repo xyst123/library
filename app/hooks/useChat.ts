@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
-import { message as antMessage } from 'antd';
+import type { MessageInstance } from 'antd/es/message/interface';
 import type { Message } from '../components';
 
 interface UseChatOptions {
   provider?: string;
   onError?: (error: Error) => void;
+  messageApi?: MessageInstance;
 }
 
 interface UseChatReturn {
@@ -27,13 +28,14 @@ interface UseChatReturn {
  *
  * @example
  * ```tsx
- * const { messages, loading, sendMessage } = useChat({ provider: 'deepseek' });
+ * const { message } = App.useApp();
+ * const { messages, loading, sendMessage } = useChat({ provider: 'deepseek', messageApi: message });
  *
  * <Button onClick={() => sendMessage('你好')}>发送</Button>
  * ```
  */
 export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
-  const { provider = 'deepseek', onError } = options;
+  const { provider = 'deepseek', onError, messageApi } = options;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,17 +142,17 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
         } else {
           const error = new Error(result.error || '查询失败');
           onError?.(error);
-          antMessage.error(`查询失败: ${result.error}`);
+          messageApi?.error(`查询失败: ${result.error}`);
         }
       } catch (error: unknown) {
         const err = error as Error;
         onError?.(err);
-        antMessage.error(`查询出错: ${err.message}`);
+        messageApi?.error(`查询出错: ${err.message}`);
       } finally {
         setLoading(false);
       }
     },
-    [messages, provider, onError]
+    [messages, provider, onError, messageApi]
   );
 
   /**
@@ -162,12 +164,12 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
     try {
       await window.electronAPI.clearHistory();
       setMessages([]);
-      antMessage.success('对话历史已清空');
+      messageApi?.success('对话历史已清空');
     } catch (error: unknown) {
       const err = error as Error;
-      antMessage.error(`清空历史失败: ${err.message}`);
+      messageApi?.error(`清空历史失败: ${err.message}`);
     }
-  }, []);
+  }, [messageApi]);
 
   /**
    * 加载历史记录
@@ -194,11 +196,11 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
     try {
       await window.electronAPI.stopGeneration();
       setLoading(false);
-      antMessage.info('已停止生成');
+      messageApi?.info('已停止生成');
     } catch (error) {
       console.error('[useChat] 停止生成失败:', error);
     }
-  }, []);
+  }, [messageApi]);
 
   return {
     messages,

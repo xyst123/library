@@ -29,6 +29,7 @@ const AppContent: React.FC = () => {
   const [provider, setProvider] = useState('deepseek');
   const { messages, loading, sendMessage, clearHistory, loadHistory, stopGeneration } = useChat({
     provider,
+    messageApi: message,
   });
 
   // 设置
@@ -40,6 +41,7 @@ const AppContent: React.FC = () => {
   const [documentCount, setDocumentCount] = useState(0);
   const [fileList, setFileList] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [modelDownloading, setModelDownloading] = useState<string | null>(null); // 模型下载进度提示
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -67,12 +69,34 @@ const AppContent: React.FC = () => {
     refreshData();
     loadHistory();
 
+    // 监听模型下载进度
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleModelProgress = (_event: unknown, data: any) => {
+      const { status, progress, name, file } = data;
+      // 无论是 Reranker 还是 Embedding 模型，下载中都显示进度
+      if (status === 'progress') {
+        setModelDownloading(`正在下载 ${name || file}: ${Math.round(progress || 0)}%`);
+      } else if (status === 'ready' || status === 'done') {
+        // 只有当没有其他模型在下载时才清除状态
+        // 这里简化处理：每个模型 ready 都尝试清除，最后一个 ready 会生效
+        setModelDownloading(null);
+      } else if (status === 'error') {
+        setModelDownloading(null);
+        message.error(`模型 ${name || file} 下载失败`);
+      }
+    };
+
+    if (window.electronAPI) {
+      window.electronAPI.on('model-download-progress', handleModelProgress);
+    }
+
     return () => {
       if (window.electronAPI) {
         window.electronAPI.removeListener('ingest-progress');
+        window.electronAPI.removeListener('model-download-progress');
       }
     };
-  }, [loadHistory, refreshData]);
+  }, [loadHistory, refreshData, message]);
 
   const ingestFiles = useCallback(
     async (paths: string[]) => {
@@ -364,7 +388,8 @@ const AppContent: React.FC = () => {
               }}
               onCancel={stopGeneration}
               loading={loading}
-              placeholder="输入你的问题，按 Enter 发送（↑ 历史问题）..."
+              disabled={!!modelDownloading}
+              placeholder={modelDownloading || '输入你的问题，按 Enter 发送（↑ 历史问题）...'}
               style={{ width: '100%' }}
             />
           </div>

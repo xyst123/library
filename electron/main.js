@@ -33,6 +33,14 @@ const createWorker = () => {
       return;
     }
 
+    // 处理特殊消息 (如模型下载进度)
+    if (id === 'model-status') {
+       if (data.type === 'model-download-progress') {
+          mainWindow.webContents.send('model-download-progress', data);
+       }
+       return;
+    }
+
     if (pendingRequests.has(id)) {
       const { resolve, reject } = pendingRequests.get(id);
       if (success !== undefined) {

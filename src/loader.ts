@@ -21,6 +21,8 @@ class SemanticChunker {
   constructor() {
     this.embeddings = new HuggingFaceTransformersEmbeddings({
       model: EMBEDDING_CONFIG.model,
+      // @ts-expect-error quantized option is not in type definition but supported
+      modelOptions: { quantized: true },
     });
     this.threshold = CHUNKING_CONFIG.semantic.breakpointThresholdAmount / 100;
   }
@@ -43,13 +45,39 @@ class SemanticChunker {
   }
 
   /**
+   * 计算平均值
+   */
+  private calculateMean(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+
+  /**
+   * 计算标准差
+   */
+  private calculateStdDev(values: number[], mean: number): number {
+    if (values.length < 2) return 0;
+    const squareDiffs = values.map((value) => {
+      const diff = value - mean;
+      return diff * diff;
+    });
+    return Math.sqrt(this.calculateMean(squareDiffs));
+  }
+
+  /**
    * 语义分割文档
    */
   async splitDocuments(docs: Document[]): Promise<Document[]> {
     const result: Document[] = [];
+    const { breakpointThresholdAmount } = CHUNKING_CONFIG.semantic;
+
+    // 将 95 这种配置值映射为标准差倍数 (Sigma)
+    // 经验值：95 -> 1.5 sigma, 90 -> 1.25 sigma, 80 -> 1.0 sigma
+    // 这里简单做一个转换，让用户可以继续用 0-100 的直觉配置
+    const sigma = Math.max(0.5, (breakpointThresholdAmount - 50) / 25);
 
     for (const doc of docs) {
-      // 按句子分割
+      // 1. 按句子预分割
       const sentences = doc.pageContent
         .split(/([。！？\n]+)/)
         .filter((s) => s.trim().length > 0)
@@ -64,30 +92,40 @@ class SemanticChunker {
 
       if (sentences.length === 0) continue;
 
-      console.log(`[语义分割] 将文档分割为 ${sentences.length} 个句子`);
+      console.log(`[语义分割] 将文档预分割为 ${sentences.length} 个句子`);
 
-      // 计算每个句子的 embedding
-      const embeddings = await Promise.all(
-        sentences.map((s) => this.embeddings.embedQuery(s))
-      );
+      // 2. 计算每个句子的 embedding
+      const embeddings = await Promise.all(sentences.map((s) => this.embeddings.embedQuery(s)));
 
-      // 计算相邻句子的相似度
+      // 3. 计算相邻句子的相似度
       const similarities: number[] = [];
       for (let i = 0; i < embeddings.length - 1; i++) {
         similarities.push(this.cosineSimilarity(embeddings[i], embeddings[i + 1]));
       }
 
-      // 找到相似度低于阈值的位置作为分割点
+      // 4. 计算动态阈值 (基于标准差 Standard Deviation)
+      // 这是解决"相似度都很高"问题的最佳方案，通过检测"相对低谷"来分割
+      const mean = this.calculateMean(similarities);
+      const stdDev = this.calculateStdDev(similarities, mean);
+
+      // 阈值 = 平均值 - (sigma * 标准差)
+      // 意义：只有当相似度显著低于平均水平时，才认为是不相关的
+      const dynamicThreshold = mean - sigma * stdDev;
+
+      console.log(
+        `[语义分割] 统计信息: Mean=${mean.toFixed(4)}, StdDev=${stdDev.toFixed(4)}, Sigma=${sigma.toFixed(2)}`
+      );
+      console.log(`[语义分割] 动态阈值: ${dynamicThreshold.toFixed(4)}`);
+
+      // 5. 根据阈值进行分割
       const chunks: string[] = [];
       let currentChunk = sentences[0];
 
       for (let i = 0; i < similarities.length; i++) {
-        if (similarities[i] < this.threshold) {
-          // 相似度低，开始新块
+        if (similarities[i] < dynamicThreshold) {
           chunks.push(currentChunk.trim());
           currentChunk = sentences[i + 1];
         } else {
-          // 相似度高，合并到当前块
           currentChunk += ' ' + sentences[i + 1];
         }
       }
@@ -95,7 +133,7 @@ class SemanticChunker {
 
       console.log(`[语义分割] 最终分割为 ${chunks.length} 个语义块`);
 
-      // 创建 Document 对象
+      // 6. 创建 Document 对象
       for (const chunk of chunks) {
         result.push(
           new Document({

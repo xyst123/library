@@ -34,6 +34,7 @@ type WorkerMessage =
         chunkingStrategy: string;
         enableContextEnhancement?: boolean;
         enableHybridSearch?: boolean;
+        enableReranking?: boolean;
       };
     };
 
@@ -56,10 +57,55 @@ const handleInit: MessageHandler = async () => {
   if (!isInitialized) {
     console.log('[Worker] 正在初始化...');
 
+    // 加载已保存的设置
+    const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
+    console.log('[Worker] 尝试加载设置文件:', settingsPath);
+    try {
+      if (fs.existsSync(settingsPath)) {
+        const data = fs.readFileSync(settingsPath, 'utf-8');
+        const settings = JSON.parse(data);
+
+        // 应用设置到全局配置
+        if (settings.chunkingStrategy === 'semantic') {
+          CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
+        }
+        if (typeof settings.enableContextEnhancement === 'boolean') {
+          CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
+        }
+        if (typeof settings.enableHybridSearch === 'boolean') {
+          RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
+        }
+        if (typeof settings.enableReranking === 'boolean') {
+          RAG_CONFIG.enableReranking = settings.enableReranking;
+        }
+        console.log('[Worker] 已加载保存的设置:', {
+          reranking: RAG_CONFIG.enableReranking,
+          hybrid: RAG_CONFIG.enableHybridSearch,
+        });
+      }
+    } catch (error) {
+      console.error('[Worker] 加载设置失败:', error);
+    }
+
     // 预热向量存储，避免首次查询时冷启动
     console.log('[Worker] 正在预热向量存储...');
     await getVectorStore();
     console.log('[Worker] 向量存储预热完成');
+
+    // 设置模型下载进度回调，转发到主进程
+    const { setModelProgressCallback, preloadModels } = await import('./model');
+    setModelProgressCallback((data) => {
+      parentPort?.postMessage({
+        id: 'model-status',
+        data: {
+          type: 'model-download-progress',
+          ...data,
+        },
+      });
+    });
+
+    // 启动时预加载模型（Reranker + Embedding）
+    preloadModels();
 
     isInitialized = true;
     console.log('[Worker] 初始化完成');
@@ -236,6 +282,7 @@ const handleGetSettings: MessageHandler = async () => {
     chunkingStrategy: 'character',
     enableContextEnhancement: true,
     enableHybridSearch: false,
+    enableReranking: false,
   };
 };
 
@@ -247,6 +294,7 @@ const handleSaveSettings: MessageHandler = async (data) => {
       chunkingStrategy: string;
       enableContextEnhancement?: boolean;
       enableHybridSearch?: boolean;
+      enableReranking?: boolean;
     };
   };
   const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
@@ -274,6 +322,12 @@ const handleSaveSettings: MessageHandler = async (data) => {
     if (typeof settings.enableHybridSearch === 'boolean') {
       RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
       console.log('[Worker] 混合检索已更新为:', RAG_CONFIG.enableHybridSearch);
+    }
+
+    // 更新全局配置 - 重排序
+    if (typeof settings.enableReranking === 'boolean') {
+      RAG_CONFIG.enableReranking = settings.enableReranking;
+      console.log('[Worker] 重排序已更新为:', RAG_CONFIG.enableReranking);
     }
 
     console.log('[Worker] Chunking 策略已更新为:', CHUNKING_CONFIG.strategy);

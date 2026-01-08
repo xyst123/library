@@ -131,26 +131,58 @@ export const askQuestionStream = async (
   const embeddings = await getQueryEmbedding(question);
   let finalResults: [Document, number][];
 
+  // 如果启用 Reranking，初始检索数量扩大
+  const initialK = RAG_CONFIG.enableReranking ? RAG_CONFIG.retrievalK * 5 : RAG_CONFIG.retrievalK;
+  console.log(`[RAG] 初始检索数量: ${initialK} (Reranking: ${RAG_CONFIG.enableReranking})`);
+
   if (RAG_CONFIG.enableHybridSearch) {
     console.log('[RAG] 使用混合检索（向量 + BM25）');
-    const k = RAG_CONFIG.retrievalK;
+    // Hybrid 模式下 RRF 已经做了一次融合，我们取更多结果用于 Rerank
     const [vectorResults, bm25Results] = await Promise.all([
-      store.similaritySearchVectorWithScore(embeddings, k * 2),
-      store.bm25Search(question, k * 2),
+      store.similaritySearchVectorWithScore(embeddings, initialK * 2),
+      store.bm25Search(question, initialK * 2),
     ]);
     console.log(`[RAG] 向量: ${vectorResults.length}, BM25: ${bm25Results.length}`);
-    finalResults = reciprocalRankFusion(vectorResults, bm25Results, k);
+    finalResults = reciprocalRankFusion(vectorResults, bm25Results, initialK);
   } else {
     console.log('[RAG] 使用纯向量检索');
-    const rawResults = await store.similaritySearchVectorWithScore(
-      embeddings,
-      RAG_CONFIG.retrievalK
-    );
-    const filteredResults = rawResults.filter(
-      ([, distance]) => distance < RAG_CONFIG.similarityThreshold
-    );
-    finalResults =
-      filteredResults.length > 0 ? filteredResults : rawResults.slice(0, RAG_CONFIG.retrievalK);
+    const rawResults = await store.similaritySearchVectorWithScore(embeddings, initialK);
+    // 向量检索的 score 是距离 (越小越好)，如果不 Rerank 需过滤
+    // 如果 Rerank，我们先不过滤，让 Reranker 决定
+    finalResults = RAG_CONFIG.enableReranking
+      ? rawResults
+      : rawResults.filter(([, distance]) => distance < RAG_CONFIG.similarityThreshold);
+  }
+
+  // 2. 重排序 (Reranking)
+  if (RAG_CONFIG.enableReranking && finalResults.length > 0) {
+    console.log(`[RAG] 正在重排序 (Reranking)...`);
+    try {
+      const { rerankDocs } = await import('./model');
+
+      const docsToRank = finalResults.map(([doc]) => doc.pageContent);
+      const scores = await rerankDocs(question, docsToRank);
+
+      // 更新分数并重新排序
+      finalResults = finalResults.map(([doc], i) => [doc, scores[i] as number]);
+      finalResults.sort((a, b) => b[1] - a[1]); // 分数从高到低
+
+      // 截取 Top N
+      finalResults = finalResults.slice(0, RAG_CONFIG.retrievalK);
+
+      // 打印前3条结果
+      finalResults.forEach(([doc, score], i) => {
+        if (i < 3)
+          console.log(
+            `[Rerank] Top ${i + 1}: ${(score as number).toFixed(4)} - ${doc.pageContent.slice(0, 20)}...`
+          );
+      });
+    } catch (e) {
+      console.error('[RAG] 重排序失败，降级为原始结果:', e);
+      // 重排序失败时，直接按距离排序后截取（不再过滤，因为初始检索已扩大范围）
+      finalResults.sort((a, b) => a[1] - b[1]); // 距离从小到大
+      finalResults = finalResults.slice(0, RAG_CONFIG.retrievalK);
+    }
   }
 
   console.log(`[RAG] 最终返回 ${finalResults.length} 个文档块`);

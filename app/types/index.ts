@@ -37,6 +37,7 @@ export interface AppSettings {
   chunkingStrategy: string;
   enableContextEnhancement: boolean;
   enableHybridSearch: boolean;
+  enableReranking?: boolean;
 }
 
 /** 历史消息格式（用于 IPC 传输） */
@@ -57,6 +58,16 @@ export interface AskQuestionResult {
 export interface HistoryResult {
   success: boolean;
   history?: Message[];
+}
+
+// 模型下载状态
+export interface ModelDownloadStatus {
+  file: string;
+  status: 'progress' | 'done' | 'ready' | 'error';
+  name: string;
+  loaded?: number;
+  total?: number;
+  progress?: number;
 }
 
 // Electron API 类型
@@ -108,6 +119,7 @@ export interface ElectronAPI {
       data: { current: number; total: number; status: string; file: string }
     ) => void
   ) => void;
+  onModelDownloadProgress: (callback: (event: unknown, data: ModelDownloadStatus) => void) => void;
 }
 
 declare global {
