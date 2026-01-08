@@ -18,17 +18,17 @@ interface UseChatReturn {
 
 /**
  * 聊天 Hook - 封装与 Electron IPC 的交互逻辑
- * 
+ *
  * 功能：
  * - 管理消息列表状态
  * - 处理流式响应（文本 + 工具调用）
  * - 自动保存历史记录
  * - 错误处理
- * 
+ *
  * @example
  * ```tsx
  * const { messages, loading, sendMessage } = useChat({ provider: 'deepseek' });
- * 
+ *
  * <Button onClick={() => sendMessage('你好')}>发送</Button>
  * ```
  */
@@ -67,10 +67,7 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
       // 监听流式事件
-      const handleAnswerStart = (
-        _event: unknown,
-        data: { sources: Message['sources'] }
-      ) => {
+      const handleAnswerStart = (_event: unknown, data: { sources: Message['sources'] }) => {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last.role === 'assistant') {
@@ -121,14 +118,15 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
           // 更新最终消息内容（保留已设置的 sources 和 toolCalls）
           setMessages((prev) => {
             const last = prev[prev.length - 1];
-            if (last.role === 'assistant') {
+            if (last.role === 'assistant' && result.answer) {
               return [
                 ...prev.slice(0, -1),
-                { 
-                  ...last, 
-                  content: result.answer!,
-                  // 只在 result 中有 sources 且不为空时才覆盖
-                  ...(result.sources && result.sources.length > 0 ? { sources: result.sources } : {})
+                {
+                  ...last,
+                  content: result.answer,
+                  ...(result.sources && result.sources.length > 0
+                    ? { sources: result.sources }
+                    : {}),
                 },
               ];
             }
@@ -136,7 +134,9 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
           });
 
           // 保存助手历史记录
-          await window.electronAPI.addHistory('assistant', result.answer!);
+          if (result.answer) {
+            await window.electronAPI.addHistory('assistant', result.answer);
+          }
         } else {
           const error = new Error(result.error || '查询失败');
           onError?.(error);

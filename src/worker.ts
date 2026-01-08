@@ -4,9 +4,15 @@ import fs from 'node:fs';
 import { loadAndSplit } from './loader';
 import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from './sqliteStore';
 import { askQuestionStream } from './rag';
-import { LLMProvider, CHUNKING_CONFIG, ChunkingStrategy, STORAGE_CONFIG, RAG_CONFIG } from './config';
+import {
+  LLMProvider,
+  CHUNKING_CONFIG,
+  ChunkingStrategy,
+  STORAGE_CONFIG,
+  RAG_CONFIG,
+} from './config';
 import type { Document } from '@langchain/core/documents';
-import { ChatMessage } from './utils';
+import type { ChatMessage } from './utils';
 
 // 消息类型定义
 type WorkerMessage =
@@ -21,7 +27,15 @@ type WorkerMessage =
   | { type: 'clear-history' }
   | { type: 'stop-generation' }
   | { type: 'get-settings' }
-  | { type: 'save-settings'; settings: { provider: string; chunkingStrategy: string; enableContextEnhancement?: boolean; enableHybridSearch?: boolean } };
+  | {
+      type: 'save-settings';
+      settings: {
+        provider: string;
+        chunkingStrategy: string;
+        enableContextEnhancement?: boolean;
+        enableHybridSearch?: boolean;
+      };
+    };
 
 // 消息处理器上下文
 interface HandlerContext {
@@ -41,12 +55,12 @@ let currentController: AbortController | null = null;
 const handleInit: MessageHandler = async () => {
   if (!isInitialized) {
     console.log('[Worker] 正在初始化...');
-    
+
     // 预热向量存储，避免首次查询时冷启动
     console.log('[Worker] 正在预热向量存储...');
     await getVectorStore();
     console.log('[Worker] 向量存储预热完成');
-    
+
     isInitialized = true;
     console.log('[Worker] 初始化完成');
   }
@@ -207,7 +221,7 @@ const handleGetStatus: MessageHandler = async () => {
 /** 获取设置处理器 */
 const handleGetSettings: MessageHandler = async () => {
   const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
-  
+
   try {
     if (fs.existsSync(settingsPath)) {
       const data = fs.readFileSync(settingsPath, 'utf-8');
@@ -216,7 +230,7 @@ const handleGetSettings: MessageHandler = async () => {
   } catch (error) {
     console.error('[Worker] 读取设置失败:', error);
   }
-  
+
   // 返回默认设置
   return {
     chunkingStrategy: 'character',
@@ -227,22 +241,29 @@ const handleGetSettings: MessageHandler = async () => {
 
 /** 保存设置处理器 */
 const handleSaveSettings: MessageHandler = async (data) => {
-  const { settings } = data as { settings: { provider: string; chunkingStrategy: string; enableContextEnhancement?: boolean; enableHybridSearch?: boolean } };
+  const { settings } = data as {
+    settings: {
+      provider: string;
+      chunkingStrategy: string;
+      enableContextEnhancement?: boolean;
+      enableHybridSearch?: boolean;
+    };
+  };
   const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
-  
+
   try {
     // 确保数据目录存在
     if (!fs.existsSync(STORAGE_CONFIG.dataDir)) {
       fs.mkdirSync(STORAGE_CONFIG.dataDir, { recursive: true });
     }
-    
+
     // 更新全局配置 - Chunking 策略
     if (settings.chunkingStrategy === 'semantic') {
       CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
     } else {
       CHUNKING_CONFIG.strategy = ChunkingStrategy.CHARACTER;
     }
-    
+
     // 更新全局配置 - 上下文增强
     if (typeof settings.enableContextEnhancement === 'boolean') {
       CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
@@ -254,12 +275,12 @@ const handleSaveSettings: MessageHandler = async (data) => {
       RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
       console.log('[Worker] 混合检索已更新为:', RAG_CONFIG.enableHybridSearch);
     }
-    
+
     console.log('[Worker] Chunking 策略已更新为:', CHUNKING_CONFIG.strategy);
-    
+
     // 保存到文件
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-    
+
     return { success: true };
   } catch (error: unknown) {
     const err = error as Error;
@@ -271,7 +292,7 @@ const handleSaveSettings: MessageHandler = async (data) => {
 // ============ 消息处理器注册表 ============
 
 const handlers: Record<string, MessageHandler> = {
-  'init': handleInit,
+  init: handleInit,
   'ingest-files': handleIngestFiles,
   'get-file-list': handleGetFileList,
   'delete-file': handleDeleteFile,

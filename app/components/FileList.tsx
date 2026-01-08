@@ -1,22 +1,67 @@
-import type React from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { Button, Empty, Tooltip, Typography } from 'antd';
 import { UploadOutlined, FileTextOutlined, DeleteOutlined } from '@ant-design/icons';
+import { SUPPORTED_FILE_EXTENSIONS } from '../constants';
+import { useDragDrop } from '../hooks/common';
 
 const { Text } = Typography;
+
+/** 单个文件项组件，使用 memo 避免不必要的重渲染 */
+interface FileItemProps {
+  filePath: string;
+  onDelete: (filePath: string) => void;
+}
+
+const FileItem: React.FC<FileItemProps> = memo(({ filePath, onDelete }) => {
+  const fileName = useMemo(() => filePath.split('/').pop(), [filePath]);
+  const handleDelete = useCallback(() => onDelete(filePath), [filePath, onDelete]);
+
+  return (
+    <div
+      style={{
+        padding: '8px 0',
+        borderBottom: '1px solid #2d2d44',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          overflow: 'hidden',
+          flex: 1,
+          marginRight: 8,
+        }}
+      >
+        <FileTextOutlined
+          style={{ color: '#a0a0a0', marginLeft: 8, marginRight: 8, flexShrink: 0 }}
+        />
+        <Tooltip title={filePath}>
+          <Text style={{ color: '#e0e0e0', fontSize: 13 }} ellipsis>
+            {fileName}
+          </Text>
+        </Tooltip>
+      </div>
+      <Tooltip title="删除">
+        <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={handleDelete} />
+      </Tooltip>
+    </div>
+  );
+});
+
+FileItem.displayName = 'FileItem';
 
 interface FileListProps {
   /** 文件路径列表 */
   fileList: string[];
   /** 是否正在上传 */
   uploading: boolean;
-  /** 是否正在拖拽 */
-  isDragging: boolean;
   /** 上传按钮点击回调 */
   onUpload: () => void;
   /** 删除文件回调 */
   onDelete: (filePath: string) => void;
-  /** 拖拽状态变化回调 */
-  onDragStateChange: (isDragging: boolean) => void;
   /** 文件拖放回调 */
   onFilesDropped: (paths: string[]) => void;
 }
@@ -25,123 +70,60 @@ interface FileListProps {
  * 文件列表组件
  * 展示知识库中的文件，支持上传和拖放
  */
-const FileList: React.FC<FileListProps> = ({
-  fileList,
-  uploading,
-  isDragging,
-  onUpload,
-  onDelete,
-  onDragStateChange,
-  onFilesDropped,
-}) => {
-  // 处理拖放事件
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    onDragStateChange(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    onDragStateChange(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    onDragStateChange(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    const validFiles = files.filter((f) => {
-      const ext = f.name.split('.').pop()?.toLowerCase();
-      return ['txt', 'md', 'pdf', 'docx', 'html'].includes(ext || '');
+const FileList: React.FC<FileListProps> = memo(
+  ({ fileList, uploading, onUpload, onDelete, onFilesDropped }) => {
+    // 使用拖放 hook
+    const { dragProps, dragStyle } = useDragDrop({
+      allowedExtensions: SUPPORTED_FILE_EXTENSIONS,
+      onDrop: onFilesDropped,
     });
 
-    if (validFiles.length === 0) return;
-
-    const paths = validFiles.map((f) => (f as unknown as { path: string }).path);
-    onFilesDropped(paths);
-  };
-
-  return (
-    <div
-      style={{
+    // 合并容器样式
+    const containerStyle = useMemo(
+      () => ({
         padding: 16,
         height: '100%',
-        backgroundColor: isDragging ? 'rgba(29, 209, 247, 0.1)' : 'transparent',
-        transition: 'background-color 0.2s',
-        border: isDragging ? '2px dashed #1dd1f7' : 'none',
-      }}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <Button
-        block
-        type="primary"
-        icon={<UploadOutlined />}
-        onClick={onUpload}
-        loading={uploading}
-        style={{ marginBottom: 16 }}
-      >
-        上传文件
-      </Button>
+        ...dragStyle,
+      }),
+      [dragStyle]
+    );
 
-      <div style={{ marginBottom: 12 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          知识库列表 ({fileList.length})
-        </Text>
-      </div>
+    return (
+      <div style={containerStyle} {...dragProps}>
+        <Button
+          block
+          type="primary"
+          icon={<UploadOutlined />}
+          onClick={onUpload}
+          loading={uploading}
+          style={{ marginBottom: 16 }}
+        >
+          上传文件
+        </Button>
 
-      {fileList.length === 0 ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={<Text style={{ color: '#666', fontSize: 12 }}>暂无文件</Text>}
-        />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {fileList.map((item) => (
-            <div
-              key={item}
-              style={{
-                padding: '8px 0',
-                borderBottom: '1px solid #2d2d44',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  overflow: 'hidden',
-                  flex: 1,
-                  marginRight: 8,
-                }}
-              >
-                <FileTextOutlined
-                  style={{ color: '#a0a0a0', marginLeft: 8, marginRight: 8, flexShrink: 0 }}
-                />
-                <Tooltip title={item}>
-                  <Text style={{ color: '#e0e0e0', fontSize: 13 }} ellipsis>
-                    {item.split('/').pop()}
-                  </Text>
-                </Tooltip>
-              </div>
-              <Tooltip title="删除">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => onDelete(item)}
-                />
-              </Tooltip>
-            </div>
-          ))}
+        <div style={{ marginBottom: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            知识库列表 ({fileList.length})
+          </Text>
         </div>
-      )}
-    </div>
-  );
-};
+
+        {fileList.length === 0 ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={<Text style={{ color: '#666', fontSize: 12 }}>暂无文件</Text>}
+          />
+        ) : (
+          <div style={{ height: 'calc(100% - 100px)', overflow: 'auto' }}>
+            {fileList.map((item) => (
+              <FileItem key={item} filePath={item} onDelete={onDelete} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+FileList.displayName = 'FileList';
 
 export default FileList;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type React from 'react';
 import {
   Layout,
@@ -13,9 +13,11 @@ import {
 } from 'antd';
 import { Sender } from '@ant-design/x';
 import { ClearOutlined, SettingOutlined } from '@ant-design/icons';
-import { FileList, MessageItem, Settings } from './components';
+import { FileList, MessageItem, Settings, ErrorBoundary } from './components';
 import { useChat } from './hooks';
 import { colors } from './theme/colors';
+import { MESSAGES, UI_CONSTANTS, TRANSITIONS } from './constants';
+import { formatError } from './utils';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;
@@ -38,7 +40,6 @@ const AppContent: React.FC = () => {
   const [documentCount, setDocumentCount] = useState(0);
   const [fileList, setFileList] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +48,7 @@ const AppContent: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     if (!window.electronAPI) return;
     try {
       const status = await window.electronAPI.getStatus();
@@ -59,7 +60,7 @@ const AppContent: React.FC = () => {
     } catch (error) {
       console.error('刷新数据失败:', error);
     }
-  };
+  }, []);
 
   // 初始化
   useEffect(() => {
@@ -71,9 +72,33 @@ const AppContent: React.FC = () => {
         window.electronAPI.removeListener('ingest-progress');
       }
     };
-  }, [loadHistory]);
+  }, [loadHistory, refreshData]);
 
-  const handleUpload = async () => {
+  const ingestFiles = useCallback(
+    async (paths: string[]) => {
+      if (!window.electronAPI) return;
+      setUploading(true);
+      message.loading({ content: MESSAGES.UPLOAD.LOADING, key: 'uploading' });
+
+      try {
+        const result = await window.electronAPI.ingestFiles(paths);
+        message[result.success ? 'success' : 'error']({
+          content: result.success
+            ? MESSAGES.UPLOAD.SUCCESS(paths.length)
+            : MESSAGES.UPLOAD.ERROR(result.error ?? '未知错误'),
+          key: 'uploading',
+        });
+        if (result.success) await refreshData();
+      } catch (error: unknown) {
+        message.error(MESSAGES.UPLOAD.ERROR(formatError(error)));
+      } finally {
+        setUploading(false);
+      }
+    },
+    [message, refreshData]
+  );
+
+  const handleUpload = useCallback(async () => {
     if (!window.electronAPI) return;
     try {
       const filePaths = await window.electronAPI.selectFiles();
@@ -83,82 +108,75 @@ const AppContent: React.FC = () => {
     } catch (error: unknown) {
       message.error(`操作失败: ${(error as Error).message}`);
     }
-  };
+  }, [ingestFiles, message]);
 
-  const ingestFiles = async (paths: string[]) => {
-    if (!window.electronAPI) return;
-    setUploading(true);
-    message.loading({ content: '正在索引文件...', key: 'uploading' });
-
-    try {
-      const result = await window.electronAPI.ingestFiles(paths);
-      message[result.success ? 'success' : 'error']({
-        content: result.success ? `成功导入 ${paths.length} 个文件` : `导入失败: ${result.error}`,
-        key: 'uploading'
-      });
-      if (result.success) await refreshData();
-    } catch (error: unknown) {
-      message.error(`导入发生错误: ${(error as Error).message}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDeleteFile = async (filePath: string) => {
-    if (!window.electronAPI) return;
-    try {
-      const result = await window.electronAPI.deleteFile(filePath);
-      message[result.success ? 'success' : 'error'](
-        result.success ? '文件已删除并更新索引' : `删除失败: ${result.error}`
-      );
-      if (result.success) await refreshData();
-    } catch (error: unknown) {
-      message.error(`操作出错: ${(error as Error).message}`);
-    }
-  };
+  const handleDeleteFile = useCallback(
+    async (filePath: string) => {
+      if (!window.electronAPI) return;
+      try {
+        const result = await window.electronAPI.deleteFile(filePath);
+        message[result.success ? 'success' : 'error'](
+          result.success
+            ? MESSAGES.DELETE.SUCCESS
+            : MESSAGES.DELETE.ERROR(result.error ?? '未知错误')
+        );
+        if (result.success) await refreshData();
+      } catch (error: unknown) {
+        message.error(MESSAGES.DELETE.ERROR(formatError(error)));
+      }
+    },
+    [message, refreshData]
+  );
 
   // 发送消息
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!input.trim()) return;
     const question = input.trim();
     setInput('');
     setHistoryIndex(-1);
     await sendMessage(question);
     await refreshData();
-  };
+  }, [input, sendMessage, refreshData]);
+
+  // 缓存用户消息列表
+  const userMessages = useMemo(() => messages.filter((msg) => msg.role === 'user'), [messages]);
 
   // 处理键盘事件（上箭头填入历史问题）
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowUp' && !e.shiftKey) {
-      const userMessages = messages.filter((msg) => msg.role === 'user');
-      if (userMessages.length === 0) return;
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowUp' && !e.shiftKey) {
+        if (userMessages.length === 0) return;
 
-      e.preventDefault();
-      const newIndex = historyIndex + 1;
-      if (newIndex < userMessages.length) {
+        e.preventDefault();
+        const newIndex = historyIndex + 1;
+        if (newIndex < userMessages.length) {
+          setHistoryIndex(newIndex);
+          setInput(userMessages[userMessages.length - 1 - newIndex].content);
+        }
+      } else if (e.key === 'ArrowDown' && !e.shiftKey && historyIndex >= 0) {
+        e.preventDefault();
+        const newIndex = historyIndex - 1;
         setHistoryIndex(newIndex);
-        setInput(userMessages[userMessages.length - 1 - newIndex].content);
+        if (newIndex >= 0) {
+          setInput(userMessages[userMessages.length - 1 - newIndex].content);
+        } else {
+          setInput('');
+        }
       }
-    } else if (e.key === 'ArrowDown' && !e.shiftKey && historyIndex >= 0) {
-      e.preventDefault();
-      const userMessages = messages.filter((msg) => msg.role === 'user');
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      if (newIndex >= 0) {
-        setInput(userMessages[userMessages.length - 1 - newIndex].content);
-      } else {
-        setInput('');
-      }
-    }
-  };
+    },
+    [userMessages, historyIndex]
+  );
 
-  const handleFilesDropped = async (paths: string[]) => {
-    if (paths.length === 0) {
-      message.warning('请拖入支持的文件 (.txt, .md, .pdf, .docx, .html)');
-      return;
-    }
-    await ingestFiles(paths);
-  };
+  const handleFilesDropped = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0) {
+        message.warning(MESSAGES.FILE.INVALID);
+        return;
+      }
+      await ingestFiles(paths);
+    },
+    [message, ingestFiles]
+  );
 
   return (
     <Layout className="tech-layout-bg" style={{ height: '100vh' }}>
@@ -192,7 +210,7 @@ const AppContent: React.FC = () => {
             {documentCount} 文档块
           </Text>
           <Popconfirm
-            title="确认清空对话历史？"
+            title={MESSAGES.HISTORY.CONFIRM}
             onConfirm={clearHistory}
             okText="是"
             cancelText="否"
@@ -203,8 +221,8 @@ const AppContent: React.FC = () => {
               title="清空历史"
               style={{
                 color: colors.text.secondary,
-                fontSize: '16px',
-                transition: 'all 0.3s ease',
+                fontSize: UI_CONSTANTS.BUTTON_FONT_SIZE,
+                transition: TRANSITIONS.DEFAULT,
               }}
               onMouseEnter={(e) => {
                 Object.assign(e.currentTarget.style, {
@@ -229,8 +247,8 @@ const AppContent: React.FC = () => {
             onClick={() => setSettingsVisible(true)}
             style={{
               color: colors.text.secondary,
-              fontSize: '16px',
-              transition: 'all 0.3s ease',
+              fontSize: UI_CONSTANTS.BUTTON_FONT_SIZE,
+              transition: TRANSITIONS.DEFAULT,
             }}
             onMouseEnter={(e) => {
               Object.assign(e.currentTarget.style, {
@@ -253,20 +271,18 @@ const AppContent: React.FC = () => {
       <Layout className="tech-layout-bg">
         {/* 左侧边栏 - 文件列表 */}
         <Sider
-          width={280}
+          width={UI_CONSTANTS.SIDEBAR_WIDTH}
           className="tech-sider"
           style={{
             overflow: 'auto',
-            height: 'calc(100vh - 64px)',
+            height: `calc(100vh - ${UI_CONSTANTS.HEADER_HEIGHT}px)`,
           }}
         >
           <FileList
             fileList={fileList}
             uploading={uploading}
-            isDragging={isDragging}
             onUpload={handleUpload}
             onDelete={handleDeleteFile}
-            onDragStateChange={setIsDragging}
             onFilesDropped={handleFilesDropped}
           />
         </Sider>
@@ -293,7 +309,9 @@ const AppContent: React.FC = () => {
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
-                  <Text style={{ color: colors.text.muted }}>在左侧上传文档，然后在这里开始提问</Text>
+                  <Text style={{ color: colors.text.muted }}>
+                    在左侧上传文档，然后在这里开始提问
+                  </Text>
                 }
                 style={{ marginTop: 100 }}
               />
@@ -327,7 +345,7 @@ const AppContent: React.FC = () => {
               bottom: '0',
               left: 0,
               right: 0,
-              height: '120px',
+              height: `${UI_CONSTANTS.GRADIENT_HEIGHT}px`,
               background:
                 'linear-gradient(to bottom, rgba(10, 15, 30, 0) 0%, rgba(10, 15, 30, 0.85) 15%, rgba(10, 15, 30, 0.93) 30%, rgba(10, 15, 30, 0.96) 50%, rgba(10, 15, 30, 0.98) 70%, rgba(10, 15, 30, 0.99) 85%, rgba(10, 15, 30, 1) 100%)',
               pointerEvents: 'none',
@@ -336,10 +354,7 @@ const AppContent: React.FC = () => {
           />
 
           {/* 输入区域 */}
-          <div 
-            style={{ padding: '0', position: 'relative', zIndex: 2 }}
-            onKeyDown={handleKeyDown}
-          >
+          <div style={{ padding: '0', position: 'relative', zIndex: 2 }} onKeyDown={handleKeyDown}>
             <Sender
               className="tech-sender"
               value={input}
@@ -369,9 +384,11 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AntApp>
-      <AppContent />
-    </AntApp>
+    <ErrorBoundary>
+      <AntApp>
+        <AppContent />
+      </AntApp>
+    </ErrorBoundary>
   );
 };
 

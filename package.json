@@ -8,10 +8,24 @@
     "dev:electron": "wait-on http://localhost:5173 && ELECTRON_RUN_AS_NODE= electron .",
     "build": "vite build",
     "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
-    "lint": "eslint . --ext ts,tsx,js --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "dist": "npm run build && electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "prepare": "husky",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
+    "release": "npm run changelog && git add CHANGELOG.md"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
   },
   "keywords": [],
   "author": "",
@@ -37,11 +51,14 @@
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.33.5",
     "sqlite-vss": "^0.1.2",
     "uuid": "^13.0.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.3.0",
+    "@commitlint/config-conventional": "^20.3.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
@@ -51,12 +68,15 @@
     "@typescript-eslint/parser": "^7.1.0",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
+    "conventional-changelog-cli": "^4.1.0",
     "electron": "^33.0.0",
     "electron-builder": "^26.0.12",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.2.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",

@@ -2,8 +2,8 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/huggingface_transformers';
 import { LLMProvider, LLM_CONFIG, EMBEDDING_CONFIG, getEnv } from './config';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { Embeddings } from '@langchain/core/embeddings';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { Embeddings } from '@langchain/core/embeddings';
 
 let embeddingInstance: Embeddings | null = null;
 

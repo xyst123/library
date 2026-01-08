@@ -5,7 +5,9 @@ import zhCN from 'antd/locale/zh_CN';
 import App from './App';
 import './styles/index.css';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('未找到 root 元素');
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ConfigProvider
       locale={zhCN}

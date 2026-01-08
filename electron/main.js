@@ -4,6 +4,9 @@ const path = require('path');
 const { Worker } = require('worker_threads');
 const { startMcpServer } = require('./mcp_server');
 
+// 屏蔽非致命的 Chromium 错误日志 (如 Autofill.enable failed)
+app.commandLine.appendSwitch('log-level', '3');
+
 // 重定向 console.log 到 console.error，避免干扰 MCP stdio 传输
 console.log = function(...args) {
   console.error(...args);

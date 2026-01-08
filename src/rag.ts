@@ -1,10 +1,12 @@
 import { PromptTemplate } from '@langchain/core/prompts';
 import { RunnableSequence } from '@langchain/core/runnables';
-import { Document } from '@langchain/core/documents';
+import type { Document } from '@langchain/core/documents';
 import { getLLM } from './model';
 import { getVectorStore } from './sqliteStore';
-import { LLMProvider, RAG_CONFIG } from './config';
-import { ChatMessage, formatHistory, formatDocumentsAsString } from './utils';
+import type { LLMProvider } from './config';
+import { RAG_CONFIG } from './config';
+import type { ChatMessage } from './utils';
+import { formatHistory, formatDocumentsAsString } from './utils';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 
@@ -18,14 +20,17 @@ const embeddingCache = new Map<string, number[]>();
 const getQueryEmbedding = async (query: string): Promise<number[]> => {
   if (embeddingCache.has(query)) {
     console.log('[RAG] 使用缓存的 embedding');
-    return embeddingCache.get(query)!;
+    const cached = embeddingCache.get(query);
+    if (cached) return cached;
+    throw new Error('缓存异常：embeddingCache.has 但 get 失败');
   }
 
   const store = await getVectorStore();
   const embedding = await store.embeddings.embedQuery(query);
 
   if (embeddingCache.size >= CACHE_SIZE) {
-    embeddingCache.delete(embeddingCache.keys().next().value!);
+    const first = embeddingCache.keys().next();
+    if (!first.done) embeddingCache.delete(first.value);
   }
   embeddingCache.set(query, embedding);
   return embedding;
@@ -53,10 +58,10 @@ const reciprocalRankFusion = (
       const key = doc.pageContent;
       const rrfScore = 1 / (60 + rank + 1);
       const existing = scoreMap.get(key);
-      
-      scoreMap.set(key, existing 
-        ? { ...existing, score: existing.score + rrfScore }
-        : { doc, score: rrfScore }
+
+      scoreMap.set(
+        key,
+        existing ? { ...existing, score: existing.score + rrfScore } : { doc, score: rrfScore }
       );
     });
   });
@@ -74,13 +79,17 @@ const reciprocalRankFusion = (
  */
 const weatherCardTool = new DynamicStructuredTool({
   name: 'show_weather_card',
-  description: '当用户询问天气相关问题时，调用此工具显示天气卡片。需要提供城市名称、温度、天气状况和图标代码。',
+  description:
+    '当用户询问天气相关问题时，调用此工具显示天气卡片。需要提供城市名称、温度、天气状况和图标代码。',
   schema: z.object({
     city: z.string().describe('城市名称'),
     temp: z.number().describe('温度（摄氏度）'),
     condition: z.string().describe('天气状况描述，如：晴、多云、雨、雪'),
-    icon: z.enum(['sunny', 'cloudy', 'rain', 'snow', 'thunder', 'fog', 'wind', 'partlyCloudy'])
-      .describe('天气图标代码：sunny(晴), cloudy(多云), rain(雨), snow(雪), thunder(雷), fog(雾), wind(风), partlyCloudy(少云)'),
+    icon: z
+      .enum(['sunny', 'cloudy', 'rain', 'snow', 'thunder', 'fog', 'wind', 'partlyCloudy'])
+      .describe(
+        '天气图标代码：sunny(晴), cloudy(多云), rain(雨), snow(雪), thunder(雷), fog(雾), wind(风), partlyCloudy(少云)'
+      ),
   }),
   func: async ({ city, temp, condition }) => {
     // 返回格式化的天气信息（供 LLM 知晓工具已调用）
@@ -133,9 +142,15 @@ export const askQuestionStream = async (
     finalResults = reciprocalRankFusion(vectorResults, bm25Results, k);
   } else {
     console.log('[RAG] 使用纯向量检索');
-    const rawResults = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
-    const filteredResults = rawResults.filter(([, distance]) => distance < RAG_CONFIG.similarityThreshold);
-    finalResults = filteredResults.length > 0 ? filteredResults : rawResults.slice(0, RAG_CONFIG.retrievalK);
+    const rawResults = await store.similaritySearchVectorWithScore(
+      embeddings,
+      RAG_CONFIG.retrievalK
+    );
+    const filteredResults = rawResults.filter(
+      ([, distance]) => distance < RAG_CONFIG.similarityThreshold
+    );
+    finalResults =
+      filteredResults.length > 0 ? filteredResults : rawResults.slice(0, RAG_CONFIG.retrievalK);
   }
 
   console.log(`[RAG] 最终返回 ${finalResults.length} 个文档块`);
@@ -185,7 +200,7 @@ export const askQuestionStream = async (
 
   // 包装 stream，收集工具调用信息（最佳实践：返回结构化数据）
   const toolCallsCollected: ToolCall[] = [];
-  
+
   async function* streamWithToolCalls(): AsyncGenerator<string> {
     try {
       for await (const chunk of rawStream) {
@@ -193,7 +208,7 @@ export const askQuestionStream = async (
         if (chunk.additional_kwargs?.tool_calls) {
           const toolCalls = chunk.additional_kwargs.tool_calls;
           console.log('[RAG] 检测到 tool_calls:', JSON.stringify(toolCalls, null, 2));
-          
+
           // 收集所有 tool calls（结构化数据）
           for (const toolCall of toolCalls) {
             if (toolCall.function?.name === 'show_weather_card') {
@@ -210,14 +225,17 @@ export const askQuestionStream = async (
             }
           }
         }
-        
+
         // 输出文本内容
         if (chunk.content) {
-          const content = typeof chunk.content === 'string' 
-            ? chunk.content 
-            : Array.isArray(chunk.content) 
-              ? chunk.content.map(c => typeof c === 'string' ? c : (c as { text?: string }).text || '').join('')
-              : '';
+          const content =
+            typeof chunk.content === 'string'
+              ? chunk.content
+              : Array.isArray(chunk.content)
+                ? chunk.content
+                    .map((c) => (typeof c === 'string' ? c : (c as { text?: string }).text || ''))
+                    .join('')
+                : '';
           if (content) yield content;
         }
       }

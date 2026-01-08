@@ -33,6 +33,10 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const loadSettings = async () => {
     try {
+      if (!window.electronAPI) {
+        console.error('electronAPI 未定义');
+        return;
+      }
       const settings = await window.electronAPI.getSettings();
       if (settings) {
         setChunkingStrategy(settings.chunkingStrategy || 'character');
@@ -47,15 +51,22 @@ export const Settings: React.FC<SettingsProps> = ({
   const handleOk = async () => {
     setLoading(true);
     try {
-      if (window.electronAPI) {
-        await window.electronAPI.saveSettings({
-          provider,
-          chunkingStrategy,
-          enableContextEnhancement,
-          enableHybridSearch,
-        });
+      if (!window.electronAPI) {
+        console.error('electronAPI 未定义');
+        return;
       }
-      console.log('设置已保存:', { provider, chunkingStrategy, enableContextEnhancement, enableHybridSearch });
+      await window.electronAPI.saveSettings({
+        provider,
+        chunkingStrategy,
+        enableContextEnhancement,
+        enableHybridSearch,
+      });
+      console.log('设置已保存:', {
+        provider,
+        chunkingStrategy,
+        enableContextEnhancement,
+        enableHybridSearch,
+      });
       onClose();
     } catch (error) {
       console.error('保存设置失败:', error);
