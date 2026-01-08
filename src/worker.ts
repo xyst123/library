@@ -1,9 +1,10 @@
 import { parentPort } from 'node:worker_threads';
 import path from 'node:path';
+import fs from 'node:fs';
 import { loadAndSplit } from './loader';
 import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from './sqliteStore';
 import { askQuestionStream } from './rag';
-import { LLMProvider } from './config';
+import { LLMProvider, CHUNKING_CONFIG, ChunkingStrategy, STORAGE_CONFIG, RAG_CONFIG } from './config';
 import type { Document } from '@langchain/core/documents';
 import { ChatMessage } from './utils';
 
@@ -18,7 +19,9 @@ type WorkerMessage =
   | { type: 'get-history' }
   | { type: 'add-history'; role: 'user' | 'assistant'; content: string }
   | { type: 'clear-history' }
-  | { type: 'stop-generation' };
+  | { type: 'stop-generation' }
+  | { type: 'get-settings' }
+  | { type: 'save-settings'; settings: { provider: string; chunkingStrategy: string; enableContextEnhancement?: boolean; enableHybridSearch?: boolean } };
 
 // 消息处理器上下文
 interface HandlerContext {
@@ -201,6 +204,70 @@ const handleGetStatus: MessageHandler = async () => {
   }
 };
 
+/** 获取设置处理器 */
+const handleGetSettings: MessageHandler = async () => {
+  const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
+  
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const data = fs.readFileSync(settingsPath, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('[Worker] 读取设置失败:', error);
+  }
+  
+  // 返回默认设置
+  return {
+    chunkingStrategy: 'character',
+    enableContextEnhancement: true,
+    enableHybridSearch: false,
+  };
+};
+
+/** 保存设置处理器 */
+const handleSaveSettings: MessageHandler = async (data) => {
+  const { settings } = data as { settings: { provider: string; chunkingStrategy: string; enableContextEnhancement?: boolean; enableHybridSearch?: boolean } };
+  const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
+  
+  try {
+    // 确保数据目录存在
+    if (!fs.existsSync(STORAGE_CONFIG.dataDir)) {
+      fs.mkdirSync(STORAGE_CONFIG.dataDir, { recursive: true });
+    }
+    
+    // 更新全局配置 - Chunking 策略
+    if (settings.chunkingStrategy === 'semantic') {
+      CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
+    } else {
+      CHUNKING_CONFIG.strategy = ChunkingStrategy.CHARACTER;
+    }
+    
+    // 更新全局配置 - 上下文增强
+    if (typeof settings.enableContextEnhancement === 'boolean') {
+      CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
+      console.log('[Worker] 上下文增强已更新为:', CHUNKING_CONFIG.enableContextEnhancement);
+    }
+
+    // 更新全局配置 - 混合检索
+    if (typeof settings.enableHybridSearch === 'boolean') {
+      RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
+      console.log('[Worker] 混合检索已更新为:', RAG_CONFIG.enableHybridSearch);
+    }
+    
+    console.log('[Worker] Chunking 策略已更新为:', CHUNKING_CONFIG.strategy);
+    
+    // 保存到文件
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+    
+    return { success: true };
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('[Worker] 保存设置失败:', error);
+    throw new Error(`保存设置失败: ${err.message}`);
+  }
+};
+
 // ============ 消息处理器注册表 ============
 
 const handlers: Record<string, MessageHandler> = {
@@ -214,6 +281,8 @@ const handlers: Record<string, MessageHandler> = {
   'add-history': handleAddHistory,
   'clear-history': handleClearHistory,
   'get-status': handleGetStatus,
+  'get-settings': handleGetSettings,
+  'save-settings': handleSaveSettings,
 };
 
 // ============ 主消息监听器 ============

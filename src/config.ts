@@ -55,6 +55,33 @@ export const STORAGE_CONFIG = {
   },
 };
 
+// ============ Chunking 配置 ============
+
+/** Chunking 策略枚举 */
+export enum ChunkingStrategy {
+  CHARACTER = 'character',  // 字符递归分割
+  SEMANTIC = 'semantic',    // 语义分割
+}
+
+/** Chunking 相关配置 */
+export const CHUNKING_CONFIG = {
+  /** 当前分割策略 */
+  strategy: ChunkingStrategy.CHARACTER,
+  /** 是否启用上下文增强 */
+  enableContextEnhancement: true,
+  /** 字符分割配置 */
+  character: {
+    chunkSize: 500,
+    chunkOverlap: 100,
+    separators: ['\n\n', '\n', '。', '！', '？', '；', '，', ' ', ''],
+  },
+  /** 语义分割配置 */
+  semantic: {
+    breakpointThresholdType: 'percentile' as const,
+    breakpointThresholdAmount: 95,
+  },
+};
+
 // ============ RAG 配置 ============
 
 /** RAG 检索配置 */
@@ -65,6 +92,10 @@ export const RAG_CONFIG = {
   historyLimit: 6,
   /** 相似度阈值 (向量距离，越小越相似，超过此值的结果会被过滤) */
   similarityThreshold: 0.5,
+  /** 是否启用混合检索（向量 + BM25） */
+  enableHybridSearch: false,
+  /** 混合检索中 BM25 的权重（0-1，向量权重为 1-bm25Weight） */
+  bm25Weight: 0.5,
 };
 
 // ============ 工具函数 ============

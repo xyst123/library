@@ -273,4 +273,4 @@ const startMcpServer = async (sendToWorker) => {
   }
 };
 
-export { startMcpServer };
+module.exports = { startMcpServer };

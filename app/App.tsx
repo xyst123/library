@@ -1,23 +1,39 @@
 import { useState, useEffect, useRef } from 'react';
 import type React from 'react';
-import { Layout, Button, Card, Space, Typography, Select, Spin, message, Empty, Popconfirm } from 'antd';
+import {
+  Layout,
+  Button,
+  Card,
+  Space,
+  Typography,
+  Spin,
+  App as AntApp,
+  Empty,
+  Popconfirm,
+} from 'antd';
 import { Sender } from '@ant-design/x';
-import { ClearOutlined } from '@ant-design/icons';
-import { FileList, MessageItem } from './components';
+import { ClearOutlined, SettingOutlined } from '@ant-design/icons';
+import { FileList, MessageItem, Settings } from './components';
 import { useChat } from './hooks';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { message } = AntApp.useApp();
+
   // 聊天相关（使用 useChat hook）
   const [provider, setProvider] = useState('deepseek');
   const { messages, loading, sendMessage, clearHistory, loadHistory, stopGeneration } = useChat({
     provider,
   });
-  
+
+  // 设置
+  const [settingsVisible, setSettingsVisible] = useState(false);
+
   // 其他状态
   const [input, setInput] = useState('');
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const [documentCount, setDocumentCount] = useState(0);
   const [fileList, setFileList] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -117,8 +133,34 @@ const App: React.FC = () => {
     if (!input.trim()) return;
     const question = input.trim();
     setInput('');
+    setHistoryIndex(-1);
     await sendMessage(question);
     await refreshData();
+  };
+
+  // 处理键盘事件（上箭头填入历史问题）
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp' && !e.shiftKey) {
+      const userMessages = messages.filter((msg) => msg.role === 'user');
+      if (userMessages.length === 0) return;
+
+      e.preventDefault();
+      const newIndex = historyIndex + 1;
+      if (newIndex < userMessages.length) {
+        setHistoryIndex(newIndex);
+        setInput(userMessages[userMessages.length - 1 - newIndex].content);
+      }
+    } else if (e.key === 'ArrowDown' && !e.shiftKey && historyIndex >= 0) {
+      e.preventDefault();
+      const userMessages = messages.filter((msg) => msg.role === 'user');
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      if (newIndex >= 0) {
+        setInput(userMessages[userMessages.length - 1 - newIndex].content);
+      } else {
+        setInput('');
+      }
+    }
   };
 
   // 处理拖放文件
@@ -135,31 +177,80 @@ const App: React.FC = () => {
       {/* 顶部栏 */}
       <Header
         className="tech-header"
-        style={{
-          padding: '0 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          WebkitAppRegion: 'drag',
-          zIndex: 10,
-        } as React.CSSProperties}
+        style={
+          {
+            padding: '0 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            WebkitAppRegion: 'drag',
+            zIndex: 10,
+          } as React.CSSProperties
+        }
       >
-        <Space style={{ WebkitAppRegion: 'no-drag', marginLeft: 'auto' } as React.CSSProperties}>
-          <Select
-            value={provider}
-            onChange={setProvider}
-            style={{ width: 120, marginRight: 8 }}
-            options={[
-              { value: 'deepseek', label: 'DeepSeek' },
-              { value: 'gemini', label: 'Gemini' },
-            ]}
-          />
-          <Text className="tech-text-primary" style={{ fontWeight: 'bold' }}>
+        <Space
+          size="middle"
+          style={{ WebkitAppRegion: 'no-drag', marginLeft: 'auto' } as React.CSSProperties}
+        >
+          <Text
+            className="tech-text-primary"
+            style={{
+              fontWeight: 'bold',
+              fontSize: '14px',
+              color: '#1dd1f7',
+              textShadow: '0 0 10px rgba(29, 209, 247, 0.3)',
+            }}
+          >
             {documentCount} 文档块
           </Text>
-          <Popconfirm title="确认清空对话历史？" onConfirm={clearHistory} okText="是" cancelText="否">
-            <Button type="text" icon={<ClearOutlined style={{ color: '#a0a0a0' }} />} title="清空历史" />
+          <Popconfirm
+            title="确认清空对话历史？"
+            onConfirm={clearHistory}
+            okText="是"
+            cancelText="否"
+          >
+            <Button
+              type="text"
+              icon={<ClearOutlined />}
+              title="清空历史"
+              style={{
+                color: '#a0a0a0',
+                fontSize: '16px',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ff4d4f';
+                e.currentTarget.style.background = 'rgba(255, 77, 79, 0.1)';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#a0a0a0';
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            />
           </Popconfirm>
+          <Button
+            type="text"
+            icon={<SettingOutlined />}
+            title="设置"
+            onClick={() => setSettingsVisible(true)}
+            style={{
+              color: '#a0a0a0',
+              fontSize: '16px',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#1dd1f7';
+              e.currentTarget.style.background = 'rgba(29, 209, 247, 0.1)';
+              e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#a0a0a0';
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+            }}
+          />
         </Space>
       </Header>
 
@@ -205,7 +296,9 @@ const App: React.FC = () => {
             {messages.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<Text style={{ color: '#666' }}>在左侧上传文档，然后在这里开始提问</Text>}
+                description={
+                  <Text style={{ color: '#666' }}>在左侧上传文档，然后在这里开始提问</Text>
+                }
                 style={{ marginTop: 100 }}
               />
             ) : (
@@ -231,8 +324,26 @@ const App: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* 渐变过渡层 */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              left: 0,
+              right: 0,
+              height: '120px',
+              background:
+                'linear-gradient(to bottom, rgba(10, 15, 30, 0) 0%, rgba(10, 15, 30, 0.85) 15%, rgba(10, 15, 30, 0.93) 30%, rgba(10, 15, 30, 0.96) 50%, rgba(10, 15, 30, 0.98) 70%, rgba(10, 15, 30, 0.99) 85%, rgba(10, 15, 30, 1) 100%)',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+
           {/* 输入区域 */}
-          <div style={{ padding: '0 16px' }}>
+          <div 
+            style={{ padding: '0', position: 'relative', zIndex: 2 }}
+            onKeyDown={handleKeyDown}
+          >
             <Sender
               className="tech-sender"
               value={input}
@@ -242,13 +353,29 @@ const App: React.FC = () => {
               }}
               onCancel={stopGeneration}
               loading={loading}
-              placeholder="输入你的问题，按 Enter 发送..."
+              placeholder="输入你的问题，按 Enter 发送（↑ 历史问题）..."
               style={{ width: '100%' }}
             />
           </div>
         </Content>
       </Layout>
+
+      {/* 设置弹窗 */}
+      <Settings
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        provider={provider}
+        onProviderChange={setProvider}
+      />
     </Layout>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AntApp>
+      <AppContent />
+    </AntApp>
   );
 };
 

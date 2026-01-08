@@ -69,9 +69,9 @@ const FileList: React.FC<FileListProps> = ({
       style={{
         padding: 16,
         height: '100%',
-        backgroundColor: isDragging ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+        backgroundColor: isDragging ? 'rgba(29, 209, 247, 0.1)' : 'transparent',
         transition: 'background-color 0.2s',
-        border: isDragging ? '2px dashed #00f3ff' : 'none',
+        border: isDragging ? '2px dashed #1dd1f7' : 'none',
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

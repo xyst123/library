@@ -1,5 +1,6 @@
 import { PromptTemplate } from '@langchain/core/prompts';
 import { RunnableSequence } from '@langchain/core/runnables';
+import { Document } from '@langchain/core/documents';
 import { getLLM } from './model';
 import { getVectorStore } from './sqliteStore';
 import { LLMProvider, RAG_CONFIG } from './config';
@@ -33,6 +34,47 @@ const getQueryEmbedding = async (query: string): Promise<number[]> => {
   embeddingCache.set(query, embedding);
 
   return embedding;
+};
+
+// ============ 混合检索算法 ============
+
+/**
+ * Reciprocal Rank Fusion (RRF) 算法
+ * 融合多个检索结果列表，常用于混合检索
+ * @param lists 多个检索结果列表，每个列表是 [Document, score] 数组
+ * @param k RRF 参数，通常设为 60
+ * @param topK 最终返回的结果数量
+ * @returns 融合后的结果列表
+ */
+const reciprocalRankFusion = (
+  ...listsAndParams: [...Array<[Document, number][]>, number]
+): [Document, number][] => {
+  const topK = listsAndParams.pop() as number;
+  const lists = listsAndParams as Array<[Document, number][]>;
+  const k = 60; // RRF 常数
+
+  // 使用文档内容作为唯一标识（metadata 可能不同）
+  const scoreMap = new Map<string, { doc: Document; score: number }>();
+
+  lists.forEach((list) => {
+    list.forEach(([doc, _originalScore], rank) => {
+      const key = doc.pageContent; // 使用内容作为去重 key
+      const rrfScore = 1 / (k + rank + 1); // RRF 公式
+
+      if (scoreMap.has(key)) {
+        // 累加分数
+        scoreMap.get(key)!.score += rrfScore;
+      } else {
+        scoreMap.set(key, { doc, score: rrfScore });
+      }
+    });
+  });
+
+  // 按融合分数降序排序，取前 topK
+  return Array.from(scoreMap.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((item) => [item.doc, item.score]);
 };
 
 // ============ Function Calling 工具定义 ============
@@ -86,31 +128,50 @@ export const askQuestionStream = async (
   const llm = baseLLM.bindTools ? baseLLM.bindTools([weatherCardTool]) : baseLLM;
   const store = await getVectorStore();
 
-  // 1. 检索 (使用缓存的 embedding)
-  const embeddings = await getQueryEmbedding(question);
-  // 使用配置的检索数量
-  const rawResults = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
+  // 1. 检索逻辑（根据配置选择策略）
+  let finalResults: [Document, number][];
 
-  // 2. 过滤低质量结果 (距离越小越相似)
-  const filteredResults = rawResults.filter(([_doc, distance]) => {
-    // 距离小于阈值才保留
-    return distance < RAG_CONFIG.similarityThreshold;
-  });
+  if (RAG_CONFIG.enableHybridSearch) {
+    console.log('[RAG] 使用混合检索（向量 + BM25）');
+    
+    // 并行执行向量检索和 BM25 检索
+    const embeddings = await getQueryEmbedding(question);
+    const [vectorResults, bm25Results] = await Promise.all([
+      store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK * 2),
+      store.bm25Search(question, RAG_CONFIG.retrievalK * 2),
+    ]);
 
-  // 如果过滤后没有结果，使用原始结果的前 N 个 (至少保留一些上下文)
-  const results = filteredResults.length > 0 ? filteredResults : rawResults.slice(0, 2);
-  
-  console.log(`[RAG] 检索到 ${rawResults.length} 条，过滤后 ${results.length} 条`);
+    console.log(`[RAG] 向量检索: ${vectorResults.length} 个结果`);
+    console.log(`[RAG] BM25 检索: ${bm25Results.length} 个结果`);
 
-  const relevantDocs = results.map((d) => d[0]);
-  const sources = results.map((d) => ({
-    source: d[0].metadata.source,
-    content: d[0].pageContent,
-    score: d[1], // 向量距离
+    // 使用 RRF 算法融合结果
+    finalResults = reciprocalRankFusion(vectorResults, bm25Results, RAG_CONFIG.retrievalK);
+    console.log(`[RAG] RRF 融合后: ${finalResults.length} 个结果`);
+  } else {
+    console.log('[RAG] 使用纯向量检索');
+    // 原有的纯向量检索逻辑
+    const embeddings = await getQueryEmbedding(question);
+    const rawResults = await store.similaritySearchVectorWithScore(embeddings, RAG_CONFIG.retrievalK);
+
+    // 2. 过滤低质量结果 (距离越小越相似)
+    const filteredResults = rawResults.filter(([_doc, distance]) => {
+      return distance < RAG_CONFIG.similarityThreshold;
+    });
+
+    // 如果过滤后没有结果，使用原始结果的前 N 个
+    finalResults = filteredResults.length > 0 ? filteredResults : rawResults.slice(0, RAG_CONFIG.retrievalK);
+  }
+
+  console.log(`[RAG] 最终返回 ${finalResults.length} 个文档块`);
+  const docs = finalResults.map(([doc]) => doc);
+  const sources = finalResults.map(([doc, score]) => ({
+    source: doc.metadata.source,
+    content: doc.pageContent,
+    score: score, // 向量距离或融合分数
   }));
 
   // 3. 构建 Prompt
-  const context = formatDocumentsAsString(relevantDocs);
+  const context = formatDocumentsAsString(docs);
   // 使用配置的历史记录限制
   const chatHistory = formatHistory(history.slice(-RAG_CONFIG.historyLimit));
 

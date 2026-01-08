@@ -36,6 +36,19 @@ declare global {
       clearHistory: () => Promise<{ success: boolean; error?: string }>;
       stopGeneration: () => Promise<{ success: boolean; error?: string }>;
 
+      // 设置
+      getSettings: () => Promise<{ 
+        chunkingStrategy: string; 
+        enableContextEnhancement?: boolean;
+        enableHybridSearch?: boolean;
+      }>;
+      saveSettings: (settings: {
+        provider: string;
+        chunkingStrategy: string;
+        enableContextEnhancement?: boolean;
+        enableHybridSearch?: boolean;
+      }) => Promise<{ success: boolean; error?: string }>;
+
       // 事件
       onAnswerStart: (
         callback: (

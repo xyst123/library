@@ -204,3 +204,7 @@ ipcMain.handle('stop-generation', async () => {
     return { success: false, error: error.message };
   }
 });
+
+// 设置相关
+ipcMain.handle('get-settings', createWorkerProxy('get-settings', null, { chunkingStrategy: 'character' }));
+ipcMain.handle('save-settings', createWorkerProxy('save-settings', (settings) => ({ settings })));

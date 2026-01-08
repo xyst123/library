@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearHistory: () => ipcRenderer.invoke('clear-history'),
   stopGeneration: () => ipcRenderer.invoke('stop-generation'),
 
+  // 设置
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+
   // 事件监听
   onAnswerStart: (callback) => {
     ipcRenderer.on('answer-start', callback);

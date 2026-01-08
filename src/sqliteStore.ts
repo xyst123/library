@@ -86,11 +86,36 @@ export class SQLiteVectorStore extends VectorStore {
       );
     `);
 
+    // 创建 FTS5 全文索引表（用于 BM25 检索）
+    this.db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+        content,
+        metadata UNINDEXED,
+        source UNINDEXED,
+        content='documents',
+        content_rowid='rowid'
+      );
+    `);
+
+    // 创建触发器，自动同步 documents 表到 FTS5
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
+        INSERT INTO documents_fts(rowid, content, metadata, source)
+        VALUES (new.rowid, new.content, new.metadata, new.source);
+      END;
+    `);
+
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
+        DELETE FROM documents_fts WHERE rowid = old.rowid;
+      END;
+    `);
+
     // 创建索引优化查询性能
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_documents_source ON documents(source);
     `);
-    console.log('[SQLite] 数据库索引已创建');
+    console.log('[SQLite] 数据库索引和 FTS5 全文索引已创建');
   }
 
   async addDocuments(documents: Document[]): Promise<void> {
@@ -171,6 +196,40 @@ export class SQLiteVectorStore extends VectorStore {
       // 距离越小越相似，LangChain通常期望相似度分数
       // 这里直接返回距离作为 score，调用者需要知晓
       return [doc, row.distance];
+    });
+  }
+
+  /**
+   * BM25 关键词检索（使用 FTS5）
+   * @param query 查询关键词
+   * @param k 返回结果数量
+   * @returns 文档和 BM25 分数的数组（分数越高越相关）
+   */
+  async bm25Search(query: string, k: number): Promise<[Document, number][]> {
+    // FTS5 的 BM25 排序（rank 是负数，越接近 0 表示越相关）
+    const stmt = this.db.prepare(`
+      SELECT
+        d.content,
+        d.metadata,
+        documents_fts.rank as score
+      FROM documents_fts
+      JOIN documents d ON documents_fts.rowid = d.rowid
+      WHERE documents_fts MATCH ?
+      ORDER BY documents_fts.rank
+      LIMIT ?
+    `);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results = stmt.all(query, k) as any[];
+
+    return results.map((row) => {
+      const metadata = JSON.parse(row.metadata);
+      const doc = new Document({
+        pageContent: row.content,
+        metadata: metadata,
+      });
+      // 将 FTS5 的负分转为正分（绝对值越小表示越相关）
+      return [doc, Math.abs(row.score)];
     });
   }
 

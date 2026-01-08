@@ -1,0 +1,238 @@
+import { useState, useEffect } from 'react';
+import type React from 'react';
+import { Modal, Form, Select, Radio, Space, Typography, Divider } from 'antd';
+import { SettingOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
+const { Option } = Select;
+
+interface SettingsProps {
+  visible: boolean;
+  onClose: () => void;
+  provider: string;
+  onProviderChange: (provider: string) => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({
+  visible,
+  onClose,
+  provider,
+  onProviderChange,
+}) => {
+  const [chunkingStrategy, setChunkingStrategy] = useState<string>('character');
+  const [enableContextEnhancement, setEnableContextEnhancement] = useState<boolean>(true);
+  const [enableHybridSearch, setEnableHybridSearch] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+
+  // 加载当前配置
+  useEffect(() => {
+    if (visible && window.electronAPI) {
+      loadSettings();
+    }
+  }, [visible]);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await window.electronAPI.getSettings();
+      if (settings) {
+        setChunkingStrategy(settings.chunkingStrategy || 'character');
+        setEnableContextEnhancement(settings.enableContextEnhancement ?? true);
+        setEnableHybridSearch(settings.enableHybridSearch ?? false);
+      }
+    } catch (error) {
+      console.error('加载设置失败:', error);
+    }
+  };
+
+  const handleOk = async () => {
+    setLoading(true);
+    try {
+      // 保存设置
+      if (window.electronAPI) {
+        await window.electronAPI.saveSettings({
+          provider,
+          chunkingStrategy,
+          enableContextEnhancement,
+          enableHybridSearch,
+        });
+      }
+      console.log('设置已保存:', { provider, chunkingStrategy, enableContextEnhancement, enableHybridSearch });
+      onClose();
+    } catch (error) {
+      console.error('保存设置失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={
+        <Space>
+          <SettingOutlined />
+          <span>设置</span>
+        </Space>
+      }
+      open={visible}
+      onOk={handleOk}
+      onCancel={onClose}
+      confirmLoading={loading}
+      width={600}
+    >
+      <Form layout="vertical">
+        {/* LLM 模型选择 */}
+        <Form.Item label="LLM 模型">
+          <Select value={provider} onChange={onProviderChange} size="large">
+            <Option value="deepseek">
+              <Space>
+                <span>DeepSeek</span>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  (推荐，成本低)
+                </Text>
+              </Space>
+            </Option>
+            <Option value="gemini">
+              <Space>
+                <span>Google Gemini</span>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  (多模态支持)
+                </Text>
+              </Space>
+            </Option>
+          </Select>
+        </Form.Item>
+
+        <Divider />
+
+        {/* Chunking 策略选择 */}
+        <Form.Item
+          label="文档分割策略"
+          extra={
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              更改策略后需要重新导入文档才能生效
+            </Text>
+          }
+        >
+          <Radio.Group
+            value={chunkingStrategy}
+            onChange={(e) => setChunkingStrategy(e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <Space orientation="vertical" style={{ width: '100%' }}>
+              <Radio value="character">
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>字符递归分割（推荐）</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    按段落、句子、标点符号递归分割，速度快，适合大多数场景
+                  </Text>
+                </Space>
+              </Radio>
+
+              <Radio value="semantic">
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>语义分割（实验性）</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    按语义相似度动态分组，检索更准确但速度较慢
+                  </Text>
+                  <Text type="warning" style={{ fontSize: '12px' }}>
+                    ⚠️ 使用本地模型，首次运行会下载模型文件（约 90MB）
+                  </Text>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Divider />
+
+        {/* 上下文增强开关 */}
+        <Form.Item
+          label="上下文增强"
+          extra={
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              为每个文档块添加文件名和位置信息，提升检索准确性
+            </Text>
+          }
+        >
+          <Radio.Group
+            value={enableContextEnhancement}
+            onChange={(e) => setEnableContextEnhancement(e.target.value)}
+          >
+            <Space orientation="vertical">
+              <Radio value={true}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>启用（推荐）</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    块前添加 &quot;[文档：xxx.txt - 第 1/5 块]&quot;，检索效果提升 15-40%
+                  </Text>
+                </Space>
+              </Radio>
+              <Radio value={false}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>禁用</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    保持原始文本，适合已包含丰富上下文的文档
+                  </Text>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Divider />
+
+        {/* 混合检索开关 */}
+        <Form.Item
+          label="检索策略"
+          extra={
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              混合检索结合向量相似度和关键词匹配，提升召回率和准确性
+            </Text>
+          }
+        >
+          <Radio.Group
+            value={enableHybridSearch}
+            onChange={(e) => setEnableHybridSearch(e.target.value)}
+          >
+            <Space orientation="vertical">
+              <Radio value={false}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>纯向量检索</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    基于语义相似度检索，适合概念性查询
+                  </Text>
+                </Space>
+              </Radio>
+              <Radio value={true}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>混合检索（向量 + BM25）</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    使用 RRF 算法融合向量和关键词结果，召回率提升 20-50%
+                  </Text>
+                  <Text type="warning" style={{ fontSize: '12px' }}>
+                    💡 适合专有名词、代码、精确匹配等场景
+                  </Text>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Divider />
+
+        {/* 
+        {/* 参数说明 */}
+        <Form.Item label="当前配置">
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            <Text type="secondary">
+              <Text code>字符分割</Text>: 块大小 500 字符，重叠 100 字符
+            </Text>
+            <Text type="secondary">
+              <Text code>语义分割</Text>: 相似度阈值 95%，动态块大小
+            </Text>
+          </Space>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+};

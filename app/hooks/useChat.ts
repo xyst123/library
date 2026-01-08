@@ -118,13 +118,18 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
         window.electronAPI.removeListener('tool-calls');
 
         if (result.success) {
-          // 更新最终消息内容
+          // 更新最终消息内容（保留已设置的 sources 和 toolCalls）
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last.role === 'assistant') {
               return [
                 ...prev.slice(0, -1),
-                { ...last, content: result.answer!, sources: result.sources },
+                { 
+                  ...last, 
+                  content: result.answer!,
+                  // 只在 result 中有 sources 且不为空时才覆盖
+                  ...(result.sources && result.sources.length > 0 ? { sources: result.sources } : {})
+                },
               ];
             }
             return prev;
