@@ -93,7 +93,7 @@ export const rerankDocs = (query: string, documents: string[]): Promise<number[]
         pendingRequests.delete(id);
         reject(new Error('Rerank 超时'));
       }
-    }, 60000);
+    }, 300000);
   });
 };
 

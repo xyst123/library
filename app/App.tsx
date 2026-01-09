@@ -10,6 +10,8 @@ import {
   App as AntApp,
   Empty,
   Popconfirm,
+  ConfigProvider,
+  theme,
 } from 'antd';
 import { Sender } from '@ant-design/x';
 import { ClearOutlined, SettingOutlined } from '@ant-design/icons';
@@ -410,9 +412,31 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <AntApp>
-        <AppContent />
-      </AntApp>
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm,
+          token: {
+            colorPrimary: colors.primary,
+            colorBgContainer: colors.background.overlay,
+            colorText: colors.text.primary,
+            colorTextSecondary: colors.text.secondary,
+            colorBorder: colors.border.light,
+          },
+          components: {
+            Button: {
+              primaryShadow: colors.shadow.primary,
+            },
+            Layout: {
+              headerBg: 'transparent',
+              bodyBg: 'transparent',
+            },
+          },
+        }}
+      >
+        <AntApp>
+          <AppContent />
+        </AntApp>
+      </ConfigProvider>
     </ErrorBoundary>
   );
 };

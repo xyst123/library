@@ -64,7 +64,7 @@ const initReranker = async (): Promise<void> => {
       {
         progress_callback: progressCallback,
         // @ts-expect-error quantized option is not in type definition but supported
-        quantized: true, // 使用默认量化模型 (通常是 q8)
+        quantized: false,
       }
     );
 
@@ -79,8 +79,13 @@ const initReranker = async (): Promise<void> => {
     console.log('[Reranker] 模型加载完成');
   } catch (err: any) {
     console.error('[Reranker] 初始化失败:', err);
-    if (err.message?.includes('Protobuf')) {
-      console.log('[Reranker] 检测到缓存损坏，清除后重试...');
+    if (
+      err.message &&
+      (err.message.includes('Protobuf') ||
+        err.message.includes('out of bounds') ||
+        err.message.includes('Deserialize tensor'))
+    ) {
+      console.log('[Reranker] 检测到缓存损坏 (Protobuf/Tensor)，清除后重试...');
       clearModelCache(RERANKING_CONFIG.model, 'Reranker');
       rerankerInitPromise = null;
       return ensureRerankerInit();
@@ -142,8 +147,30 @@ process.on('message', async (msg: any) => {
       padding: true,
       truncation: true,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { logits } = await rerankerModel(inputs);
-    send('rerank-result', { id, scores: Array.from(logits.data) });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dims = (logits as any).dims; // [batch_size, num_labels]
+
+    let scores: number[] = [];
+    if (dims && dims.length === 2 && dims[1] === 2) {
+      // 兼容二分类输出模型 (Non-Relevant, Relevant)
+      const data = logits.data;
+      for (let i = 0; i < dims[0]; i++) {
+        scores.push(data[i * 2 + 1]);
+      }
+    } else {
+      scores = Array.from(logits.data);
+    }
+
+    console.log(
+      `[Reranker] 计算完成 (前3个分数: ${scores
+        .slice(0, 3)
+        .map((n) => n.toFixed(4))
+        .join(', ')}...)`
+    );
+    send('rerank-result', { id, scores });
   } catch (error: any) {
     console.error('[Reranker] 推理失败:', error);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
