@@ -102,7 +102,7 @@ export const RAG_CONFIG = {
 
 /** Reranking 模型配置 */
 export const RERANKING_CONFIG = {
-  /** Reranking 模型名称 (使用 Mxbai Base V1，官方支持 ONNX，多语言) */
+  // TODO 模型有问题，计算出来的相似度完全一样
   model: 'mixedbread-ai/mxbai-rerank-base-v1',
   /** 返回 Top N 个结果给 LLM */
   topN: 4,
