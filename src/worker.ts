@@ -14,6 +14,8 @@ import {
 import type { Document } from '@langchain/core/documents';
 import type { ChatMessage } from './utils';
 
+import { PCA } from 'ml-pca';
+
 // 消息类型定义
 type WorkerMessage =
   | { type: 'init' }
@@ -27,6 +29,7 @@ type WorkerMessage =
   | { type: 'clear-history' }
   | { type: 'stop-generation' }
   | { type: 'get-settings' }
+  | { type: 'calculate-vector-positions'; query?: string }
   | {
       type: 'save-settings';
       settings: {
@@ -343,6 +346,62 @@ const handleSaveSettings: MessageHandler = async (data) => {
   }
 };
 
+/** 计算向量位置处理器 (PCA 降维) */
+const handleCalculateVectorPositions: MessageHandler = async (data) => {
+  console.log('[Worker] handleCalculateVectorPositions triggered');
+  const { query } = data as { query?: string };
+  const store = await getVectorStore();
+  const docs = await store.getAllVectors();
+  console.log(`[Worker] getAllVectors returned ${docs.length} documents`);
+
+  if (docs.length === 0) {
+    console.log('[Worker] No vectors found.');
+    return { points: [] };
+  }
+
+  // 准备数据矩阵
+  const vectors = docs.map((d) => d.vector);
+  let finalVectors = vectors;
+
+  // 如果有查询，计算查询向量并添加到矩阵末尾
+  let queryVector: number[] | null = null;
+  if (query) {
+    const { getEmbeddings } = await import('./model');
+    const embeddings = await getEmbeddings();
+    queryVector = await embeddings.embedQuery(query);
+    finalVectors = [...vectors, queryVector];
+  }
+
+  // 运行 PCA 降维 (384 -> 2)
+  console.log(`[Worker] 正在运行 PCA，数据量: ${finalVectors.length}`);
+  const pca = new PCA(finalVectors);
+  const predict = pca.predict(finalVectors, { nComponents: 2 });
+  const reducedData = predict.to2DArray();
+
+  // 映射回点对象
+  const points = docs.map((doc, i) => ({
+    x: reducedData[i][0],
+    y: reducedData[i][1],
+    text: doc.content,
+    isQuery: false,
+    id: doc.rowid,
+  }));
+
+  // 如果有查询点
+  if (queryVector) {
+    const queryPoint = reducedData[reducedData.length - 1];
+    points.push({
+      x: queryPoint[0],
+      y: queryPoint[1],
+      text: `查询: ${query}`,
+      isQuery: true,
+      id: -1,
+    });
+  }
+
+  return { points };
+};
+
 // ============ 消息处理器注册表 ============
 
 const handlers: Record<string, MessageHandler> = {
@@ -358,6 +417,7 @@ const handlers: Record<string, MessageHandler> = {
   'get-status': handleGetStatus,
   'get-settings': handleGetSettings,
   'save-settings': handleSaveSettings,
+  'calculate-vector-positions': handleCalculateVectorPositions,
 };
 
 // ============ 主消息监听器 ============

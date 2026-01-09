@@ -5,3 +5,4 @@ export { default as ErrorBoundary } from './ErrorBoundary';
 export { Settings } from './Settings';
 
 export type { Message, MessageSource, ToolCall } from '../types';
+export { VectorMap } from './VectorMap';

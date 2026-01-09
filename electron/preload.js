@@ -19,6 +19,7 @@ const IPC_EVENTS = {
   STOP_GENERATION: 'stop-generation',
   GET_SETTINGS: 'get-settings',
   SAVE_SETTINGS: 'save-settings',
+  CALCULATE_VECTOR_POSITIONS: 'calculate-vector-positions',
   INGEST_PROGRESS: 'ingest-progress',
   MODEL_DOWNLOAD_PROGRESS: 'model-download-progress',
 };
@@ -48,6 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopGeneration: () => invoke(IPC_EVENTS.STOP_GENERATION),
   getSettings: () => invoke(IPC_EVENTS.GET_SETTINGS),
   saveSettings: (s) => invoke(IPC_EVENTS.SAVE_SETTINGS, s),
+  calculateVectorPositions: (query) => invoke(IPC_EVENTS.CALCULATE_VECTOR_POSITIONS, { query }),
   
   onAnswerStart: (cb) => listen(IPC_EVENTS.ANSWER_START, cb),
   onAnswerChunk: (cb) => listen(IPC_EVENTS.ANSWER_CHUNK, cb),

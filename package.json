@@ -46,6 +46,7 @@
     "dotenv": "^16.4.5",
     "langchain": "^1.2.3",
     "mammoth": "^1.11.0",
+    "ml-pca": "^4.1.1",
     "pdf-parse": "^1.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

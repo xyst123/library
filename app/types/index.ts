@@ -70,6 +70,14 @@ export interface ModelDownloadStatus {
   progress?: number;
 }
 
+export interface VectorPoint {
+  x: number;
+  y: number;
+  text: string;
+  isQuery: boolean;
+  id: number;
+}
+
 // Electron API 类型
 export interface ElectronAPI {
   // 文件操作
@@ -95,6 +103,9 @@ export interface ElectronAPI {
   // 设置
   saveSettings: (settings: AppSettings) => Promise<void>;
   getSettings: () => Promise<AppSettings>;
+
+  // 向量地图
+  calculateVectorPositions: (query?: string) => Promise<{ points: VectorPoint[] }>;
 
   // 通用事件
   on: (channel: string, callback: (...args: unknown[]) => void) => void;

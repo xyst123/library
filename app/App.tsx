@@ -14,8 +14,13 @@ import {
   theme,
 } from 'antd';
 import { Sender } from '@ant-design/x';
-import { ClearOutlined, SettingOutlined } from '@ant-design/icons';
-import { FileList, MessageItem, Settings, ErrorBoundary } from './components';
+import {
+  ClearOutlined,
+  SettingOutlined,
+  MessageOutlined,
+  ExperimentOutlined,
+} from '@ant-design/icons';
+import { FileList, MessageItem, Settings, ErrorBoundary, VectorMap } from './components';
 import { useChat } from './hooks';
 import { colors } from './theme/colors';
 import { MESSAGES, UI_CONSTANTS, TRANSITIONS } from './constants';
@@ -26,6 +31,9 @@ const { Text } = Typography;
 
 const AppContent: React.FC = () => {
   const { message } = AntApp.useApp();
+
+  // 视图状态
+  const [currentView, setCurrentView] = useState<'chat' | 'map'>('chat');
 
   // 聊天相关（使用 useChat hook）
   const [provider, setProvider] = useState('deepseek');
@@ -224,6 +232,25 @@ const AppContent: React.FC = () => {
           size="middle"
           style={{ WebkitAppRegion: 'no-drag', marginLeft: 'auto' } as React.CSSProperties}
         >
+          {/* 视图切换 */}
+          <div style={{ marginRight: 16 }}>
+            <Button
+              type={currentView === 'chat' ? 'primary' : 'text'}
+              icon={<MessageOutlined />}
+              onClick={() => setCurrentView('chat')}
+              style={{ marginRight: 8 }}
+            >
+              对话
+            </Button>
+            <Button
+              type={currentView === 'map' ? 'primary' : 'text'}
+              icon={<ExperimentOutlined />}
+              onClick={() => setCurrentView('map')}
+            >
+              知识星图
+            </Button>
+          </div>
+
           <Text
             className="tech-text-primary"
             style={{
@@ -319,82 +346,91 @@ const AppContent: React.FC = () => {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            padding: '16px',
+            padding: currentView === 'chat' ? '16px' : 0, // 地图模式全屏
             position: 'relative',
           }}
         >
-          <div
-            style={{
-              flex: 1,
-              overflow: 'auto',
-              marginBottom: 16,
-              padding: '8px 0',
-            }}
-          >
-            {messages.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Text style={{ color: colors.text.muted }}>
-                    在左侧上传文档，然后在这里开始提问
-                  </Text>
-                }
-                style={{ marginTop: 100 }}
-              />
-            ) : (
-              messages.map((msg, index) => <MessageItem key={index} message={msg} />)
-            )}
+          {currentView === 'map' ? (
+            <VectorMap />
+          ) : (
+            <>
+              <div
+                style={{
+                  flex: 1,
+                  overflow: 'auto',
+                  marginBottom: 16,
+                  padding: '8px 0',
+                }}
+              >
+                {messages.length === 0 ? (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={
+                      <Text style={{ color: colors.text.muted }}>
+                        在左侧上传文档，然后在这里开始提问
+                      </Text>
+                    }
+                    style={{ marginTop: 100 }}
+                  />
+                ) : (
+                  messages.map((msg, index) => <MessageItem key={index} message={msg} />)
+                )}
 
-            {loading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <Card
-                  size="small"
-                  style={{
-                    background: colors.background.overlay,
-                    border: `1px solid ${colors.border.light}`,
-                  }}
-                >
-                  <Space>
-                    <Spin size="small" />
-                    <Text style={{ color: colors.text.secondary }}>思考中...</Text>
-                  </Space>
-                </Card>
+                {loading && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <Card
+                      size="small"
+                      style={{
+                        background: colors.background.overlay,
+                        border: `1px solid ${colors.border.light}`,
+                      }}
+                    >
+                      <Space>
+                        <Spin size="small" />
+                        <Text style={{ color: colors.text.secondary }}>思考中...</Text>
+                      </Space>
+                    </Card>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
 
-          {/* 渐变过渡层 */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '0',
-              left: 0,
-              right: 0,
-              height: `${UI_CONSTANTS.GRADIENT_HEIGHT}px`,
-              background:
-                'linear-gradient(to bottom, rgba(10, 15, 30, 0) 0%, rgba(10, 15, 30, 0.85) 15%, rgba(10, 15, 30, 0.93) 30%, rgba(10, 15, 30, 0.96) 50%, rgba(10, 15, 30, 0.98) 70%, rgba(10, 15, 30, 0.99) 85%, rgba(10, 15, 30, 1) 100%)',
-              pointerEvents: 'none',
-              zIndex: 1,
-            }}
-          />
+              {/* 渐变过渡层 */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: 0,
+                  right: 0,
+                  height: `${UI_CONSTANTS.GRADIENT_HEIGHT}px`,
+                  background:
+                    'linear-gradient(to bottom, rgba(10, 15, 30, 0) 0%, rgba(10, 15, 30, 0.85) 15%, rgba(10, 15, 30, 0.93) 30%, rgba(10, 15, 30, 0.96) 50%, rgba(10, 15, 30, 0.98) 70%, rgba(10, 15, 30, 0.99) 85%, rgba(10, 15, 30, 1) 100%)',
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }}
+              />
 
-          {/* 输入区域 */}
-          <div style={{ padding: '0', position: 'relative', zIndex: 2 }} onKeyDown={handleKeyDown}>
-            <Sender
-              className="tech-sender"
-              value={input}
-              onChange={setInput}
-              onSubmit={() => {
-                handleSend();
-              }}
-              onCancel={stopGeneration}
-              loading={loading}
-              disabled={!!modelDownloading}
-              placeholder={modelDownloading || '输入你的问题，按 Enter 发送（↑ 历史问题）...'}
-              style={{ width: '100%' }}
-            />
-          </div>
+              {/* 输入区域 */}
+              <div
+                style={{ padding: '0', position: 'relative', zIndex: 2 }}
+                onKeyDown={handleKeyDown}
+              >
+                <Sender
+                  className="tech-sender"
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={() => {
+                    handleSend();
+                  }}
+                  onCancel={stopGeneration}
+                  loading={loading}
+                  disabled={!!modelDownloading}
+                  placeholder={modelDownloading || '输入你的问题，按 Enter 发送（↑ 历史问题）...'}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </>
+          )}
         </Content>
       </Layout>
 

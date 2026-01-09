@@ -261,6 +261,42 @@ export class SQLiteVectorStore extends VectorStore {
     return result.count;
   }
 
+  // 获取所有文档及其向量（用于可视化）
+  async getAllVectors(): Promise<Array<{ rowid: number; content: string; vector: number[] }>> {
+    // 联合查询 documents 和 vss_documents
+    const stmt = this.db.prepare(`
+      SELECT d.rowid, d.content, v.vector
+      FROM documents d
+      JOIN vss_documents v ON d.rowid = v.rowid
+    `);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = stmt.all() as any[];
+
+    return rows.map((row) => {
+      let vector: number[];
+      if (Buffer.isBuffer(row.vector)) {
+        // sqlite-vss 返回的是 Buffer (Float32Array 的二进制形式)
+        const float32 = new Float32Array(
+          row.vector.buffer,
+          row.vector.byteOffset,
+          row.vector.length / 4
+        );
+        vector = Array.from(float32);
+      } else if (typeof row.vector === 'string') {
+        vector = JSON.parse(row.vector);
+      } else {
+        vector = row.vector; // 假定已经是数组
+      }
+
+      return {
+        rowid: row.rowid,
+        content: row.content,
+        vector: vector,
+      };
+    });
+  }
+
   static async load(dbPath: string, embeddings: Embeddings): Promise<SQLiteVectorStore> {
     const store = new SQLiteVectorStore(embeddings, dbPath);
     await store.initialize();
