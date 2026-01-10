@@ -1,5 +1,5 @@
-// @ts-expect-error EnsembleRetriever type definition might be missing in some versions but it exists at runtime
-import { EnsembleRetriever } from 'langchain/retrievers/ensemble';
+// Local EnsembleRetriever fixed import issues
+import { EnsembleRetriever } from './ensemble';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { RunnableSequence } from '@langchain/core/runnables';
 import type { Document } from '@langchain/core/documents';
