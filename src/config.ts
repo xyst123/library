@@ -98,6 +98,10 @@ export const RAG_CONFIG = {
   bm25Weight: 0.5,
   /** 是否启用重排序 (Reranking) */
   enableReranking: false,
+  /** 是否启用 CRAG (自修正 RAG) */
+  enableCRAG: false,
+  /** 是否启用网络搜索 (CRAG 回退机制) */
+  enableWebSearch: false,
 };
 
 /** Reranking 模型配置 */

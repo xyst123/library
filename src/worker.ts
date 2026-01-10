@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { loadAndSplit } from './loader';
 import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from './sqliteStore';
 import { askQuestionStream } from './rag';
+import { createCRAGGraph } from './crag';
 import {
   LLMProvider,
   CHUNKING_CONFIG,
@@ -167,6 +168,30 @@ const handleAskQuestion: MessageHandler = async (data, ctx) => {
   const llmProvider = provider === 'gemini' ? LLMProvider.GEMINI : LLMProvider.DEEPSEEK;
 
   try {
+    // 检查是否启用 CRAG
+    if (RAG_CONFIG.enableCRAG) {
+      console.log('[Worker] 使用 CRAG (Self-Correcting RAG) 模式');
+      const app = await createCRAGGraph();
+      const result = await app.invoke({
+        question: question,
+        documents: [],
+        generation: '',
+        webSearchNeeded: false,
+        searchQuery: '',
+      });
+
+      // CRAG 返回的是完整结果，模拟流式输出以兼容前端
+      const answer = result.generation as string;
+      ctx.postProgress({ type: 'answer-chunk', chunk: answer }); // Changed from 'token' to 'answer-chunk' for consistency
+      ctx.postProgress({ type: 'answer-end' }); // Changed from 'done' to 'answer-end' for consistency
+
+      // 保存历史记录
+      await addHistory('user', question);
+      await addHistory('assistant', answer);
+      return { success: true, answer: answer, sources: [], toolCalls: [] }; // Return full structure
+    }
+
+    // 标准 RAG 流程
     const { stream, sources, toolCalls } = await askQuestionStream(
       question,
       history || [],

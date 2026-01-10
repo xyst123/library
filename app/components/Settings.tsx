@@ -12,6 +12,7 @@ interface SettingsData {
   enableContextEnhancement?: boolean;
   enableHybridSearch?: boolean;
   enableReranking?: boolean;
+  enableCRAG?: boolean;
 }
 
 interface SettingsProps {
@@ -33,6 +34,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [enableContextEnhancement, setEnableContextEnhancement] = useState<boolean>(true);
   const [enableHybridSearch, setEnableHybridSearch] = useState<boolean>(false);
   const [enableReranking, setEnableReranking] = useState<boolean>(false);
+  const [enableCRAG, setEnableCRAG] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
 
   // 加载当前配置
@@ -54,6 +56,7 @@ export const Settings: React.FC<SettingsProps> = ({
         setEnableContextEnhancement(settings.enableContextEnhancement ?? true);
         setEnableHybridSearch(settings.enableHybridSearch ?? false);
         setEnableReranking(settings.enableReranking ?? false);
+        setEnableCRAG(settings.enableCRAG ?? false);
       }
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -69,6 +72,7 @@ export const Settings: React.FC<SettingsProps> = ({
       enableContextEnhancement,
       enableHybridSearch,
       enableReranking,
+      enableCRAG,
     };
     try {
       await window.electronAPI.saveSettings(settings);
@@ -264,6 +268,42 @@ export const Settings: React.FC<SettingsProps> = ({
                   <Text strong>禁用</Text>
                   <Text type="secondary" style={{ fontSize: '12px' }}>
                     速度最快，仅依赖初始检索结果
+                  </Text>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Divider />
+
+        {/* CRAG 开关 */}
+        <Form.Item
+          label="自修正 RAG (CRAG)"
+          extra={
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              对检索结果进行评分，若不相关则触发网络搜索（模拟），提高回答准确性
+            </Text>
+          }
+        >
+          <Radio.Group value={enableCRAG} onChange={(e) => setEnableCRAG(e.target.value)}>
+            <Space orientation="vertical">
+              <Radio value={true}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>启用 (推荐)</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    自动评估并修正检索结果，减少幻觉
+                  </Text>
+                  <Text type="warning" style={{ fontSize: '12px' }}>
+                    💡 适合需要高准确性的场景
+                  </Text>
+                </Space>
+              </Radio>
+              <Radio value={false}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>禁用</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    标准 RAG 流程
                   </Text>
                 </Space>
               </Radio>

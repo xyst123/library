@@ -323,15 +323,31 @@ export class SQLiteVectorStore extends VectorStore {
 }
 
 let storeInstance: SQLiteVectorStore | null = null;
+let initializationPromise: Promise<SQLiteVectorStore> | null = null;
 
 export const getVectorStore = async (): Promise<SQLiteVectorStore> => {
   if (storeInstance) return storeInstance;
+
+  // 如果正在初始化，等待初始化完成
+  if (initializationPromise) return initializationPromise;
+
   console.log('[SQLite] 正在初始化向量存储...');
-  const embeddings = await getEmbeddings();
-  console.log('[SQLite] Embeddings 就绪，正在加载数据库...');
-  storeInstance = await SQLiteVectorStore.load(DB_PATH, embeddings);
-  console.log('[SQLite] 向量存储已加载。');
-  return storeInstance;
+
+  initializationPromise = (async () => {
+    try {
+      const embeddings = await getEmbeddings();
+      console.log('[SQLite] Embeddings 就绪，正在加载数据库...');
+      const store = await SQLiteVectorStore.load(DB_PATH, embeddings);
+      console.log('[SQLite] 向量存储已加载。');
+      storeInstance = store;
+      return store;
+    } catch (e) {
+      initializationPromise = null; // 重置 promise 以便重试
+      throw e;
+    }
+  })();
+
+  return initializationPromise;
 };
 
 export const ingestDocs = async (docs: Document[]) => {
