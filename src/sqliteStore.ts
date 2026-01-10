@@ -1,5 +1,6 @@
 import { VectorStore } from '@langchain/core/vectorstores';
 import type { Embeddings } from '@langchain/core/embeddings';
+import { BaseRetriever } from '@langchain/core/retrievers';
 import { Document } from '@langchain/core/documents';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -359,3 +360,20 @@ export const getRetriever = async () => {
   const store = await getVectorStore();
   return store.asRetriever({ k: 4 });
 };
+
+export class SQLiteBM25Retriever extends BaseRetriever {
+  lc_namespace = ['local', 'retrievers'];
+  private store: SQLiteVectorStore;
+  private k: number;
+
+  constructor(store: SQLiteVectorStore, k: number) {
+    super();
+    this.store = store;
+    this.k = k;
+  }
+
+  async _getRelevantDocuments(query: string): Promise<Document[]> {
+    const results = await this.store.bm25Search(query, this.k);
+    return results.map(([doc]) => doc);
+  }
+}

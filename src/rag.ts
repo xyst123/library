@@ -1,14 +1,15 @@
+// @ts-expect-error EnsembleRetriever type definition might be missing in some versions but it exists at runtime
+import { EnsembleRetriever } from 'langchain/retrievers/ensemble';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { RunnableSequence } from '@langchain/core/runnables';
 import type { Document } from '@langchain/core/documents';
 import { getLLM } from './model';
-import { getVectorStore } from './sqliteStore';
+import { getVectorStore, SQLiteBM25Retriever } from './sqliteStore';
 import type { LLMProvider } from './config';
 import { RAG_CONFIG } from './config';
 import type { ChatMessage } from './utils';
 import { formatHistory, formatDocumentsAsString } from './utils';
-import { DynamicStructuredTool } from '@langchain/core/tools';
-import { z } from 'zod';
+import { weatherCardTool } from './tools/weather';
 
 // 简单的 embedding 缓存 (LRU 风格)
 const CACHE_SIZE = 50;
@@ -46,57 +47,15 @@ const getQueryEmbedding = async (query: string): Promise<number[]> => {
  * @param topK 最终返回的结果数量
  * @returns 融合后的结果列表
  */
-const reciprocalRankFusion = (
-  ...listsAndParams: [...Array<[Document, number][]>, number]
-): [Document, number][] => {
-  const topK = listsAndParams.pop() as number;
-  const lists = listsAndParams as Array<[Document, number][]>;
-  const scoreMap = new Map<string, { doc: Document; score: number }>();
-
-  lists.forEach((list) => {
-    list.forEach(([doc, _], rank) => {
-      const key = doc.pageContent;
-      const rrfScore = 1 / (60 + rank + 1);
-      const existing = scoreMap.get(key);
-
-      scoreMap.set(
-        key,
-        existing ? { ...existing, score: existing.score + rrfScore } : { doc, score: rrfScore }
-      );
-    });
-  });
-
-  return Array.from(scoreMap.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
-    .map(({ doc, score }) => [doc, score]);
-};
+// ============ 混合检索算法 ============
+// 已替换为 LangChain EnsembleRetriever
 
 // ============ Function Calling 工具定义 ============
 
 /**
  * 天气卡片工具 - 用于在回答中显示天气信息
  */
-const weatherCardTool = new DynamicStructuredTool({
-  name: 'show_weather_card',
-  description:
-    '当用户询问天气相关问题时，调用此工具显示天气卡片。需要提供城市名称、温度、天气状况和图标代码。',
-  schema: z.object({
-    city: z.string().describe('城市名称'),
-    temp: z.number().describe('温度（摄氏度）'),
-    condition: z.string().describe('天气状况描述，如：晴、多云、雨、雪'),
-    icon: z
-      .enum(['sunny', 'cloudy', 'rain', 'snow', 'thunder', 'fog', 'wind', 'partlyCloudy'])
-      .describe(
-        '天气图标代码：sunny(晴), cloudy(多云), rain(雨), snow(雪), thunder(雷), fog(雾), wind(风), partlyCloudy(少云)'
-      ),
-  }),
-  func: async ({ city, temp, condition }) => {
-    // 返回格式化的天气信息（供 LLM 知晓工具已调用）
-    // 注意：icon 参数会被传递到前端组件，这里不需要使用
-    return `已显示${city}的天气卡片：${condition}，温度${temp}°C`;
-  },
-});
+// Weather tool imported from ./tools/weather
 
 export interface ToolCall {
   name: string;
@@ -136,14 +95,24 @@ export const askQuestionStream = async (
   console.log(`[RAG] 初始检索数量: ${initialK} (Reranking: ${RAG_CONFIG.enableReranking})`);
 
   if (RAG_CONFIG.enableHybridSearch) {
-    console.log('[RAG] 使用混合检索（向量 + BM25）');
-    // Hybrid 模式下 RRF 已经做了一次融合，我们取更多结果用于 Rerank
-    const [vectorResults, bm25Results] = await Promise.all([
-      store.similaritySearchVectorWithScore(embeddings, initialK * 2),
-      store.bm25Search(question, initialK * 2),
-    ]);
-    console.log(`[RAG] 向量: ${vectorResults.length}, BM25: ${bm25Results.length}`);
-    finalResults = reciprocalRankFusion(vectorResults, bm25Results, initialK);
+    console.log('[RAG] 使用混合检索（向量 + BM25）- EnsembleRetriever');
+
+    // 初始化两个检索器
+    // 注意: initialK 这里作为每个检索器返回的候选数量
+    const vectorRetriever = store.asRetriever(initialK * 2);
+    const bm25Retriever = new SQLiteBM25Retriever(store, initialK * 2);
+
+    // 初始化混合检索器
+    const ensembleRetriever = new EnsembleRetriever({
+      retrievers: [vectorRetriever, bm25Retriever],
+      weights: [1 - RAG_CONFIG.bm25Weight, RAG_CONFIG.bm25Weight],
+    });
+
+    // 执行检索
+    const docs = await ensembleRetriever.invoke(question);
+    // EnsembleRetriever 返回的数据没有 score 字段 (它是基于 Rank 融合的)
+    // 我们为了兼容后续流程，给一个模拟的 score (基于 rank)
+    finalResults = docs.slice(0, initialK).map((doc: Document, i: number) => [doc, 0.9 - i * 0.01]); // 模拟降序分数
   } else {
     console.log('[RAG] 使用纯向量检索');
     const rawResults = await store.similaritySearchVectorWithScore(embeddings, initialK);
@@ -172,10 +141,11 @@ export const askQuestionStream = async (
 
       // 打印前3条结果
       finalResults.forEach(([doc, score], i) => {
-        if (i < 3)
+        if (i < 3) {
           console.log(
             `[Rerank] Top ${i + 1}: ${(score as number).toFixed(4)} - ${doc.pageContent.slice(0, 20)}...`
           );
+        }
       });
     } catch (e) {
       console.error('[RAG] 重排序失败，降级为原始结果:', e);

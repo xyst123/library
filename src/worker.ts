@@ -14,7 +14,8 @@ import {
 import type { Document } from '@langchain/core/documents';
 import type { ChatMessage } from './utils';
 
-import { PCA } from 'ml-pca';
+import { initSettings, getSettings, saveSettings } from './settings';
+import { calculateVectorPositions } from './vector-analysis';
 
 // 消息类型定义
 type WorkerMessage =
@@ -61,34 +62,7 @@ const handleInit: MessageHandler = async () => {
     console.log('[Worker] 正在初始化...');
 
     // 加载已保存的设置
-    const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
-    console.log('[Worker] 尝试加载设置文件:', settingsPath);
-    try {
-      if (fs.existsSync(settingsPath)) {
-        const data = fs.readFileSync(settingsPath, 'utf-8');
-        const settings = JSON.parse(data);
-
-        // 应用设置到全局配置
-        if (settings.chunkingStrategy === 'semantic') {
-          CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
-        }
-        if (typeof settings.enableContextEnhancement === 'boolean') {
-          CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
-        }
-        if (typeof settings.enableHybridSearch === 'boolean') {
-          RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
-        }
-        if (typeof settings.enableReranking === 'boolean') {
-          RAG_CONFIG.enableReranking = settings.enableReranking;
-        }
-        console.log('[Worker] 已加载保存的设置:', {
-          reranking: RAG_CONFIG.enableReranking,
-          hybrid: RAG_CONFIG.enableHybridSearch,
-        });
-      }
-    } catch (error) {
-      console.error('[Worker] 加载设置失败:', error);
-    }
+    initSettings();
 
     // 预热向量存储，避免首次查询时冷启动
     console.log('[Worker] 正在预热向量存储...');
@@ -269,24 +243,7 @@ const handleGetStatus: MessageHandler = async () => {
 
 /** 获取设置处理器 */
 const handleGetSettings: MessageHandler = async () => {
-  const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
-
-  try {
-    if (fs.existsSync(settingsPath)) {
-      const data = fs.readFileSync(settingsPath, 'utf-8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('[Worker] 读取设置失败:', error);
-  }
-
-  // 返回默认设置
-  return {
-    chunkingStrategy: 'character',
-    enableContextEnhancement: true,
-    enableHybridSearch: false,
-    enableReranking: false,
-  };
+  return getSettings();
 };
 
 /** 保存设置处理器 */
@@ -300,106 +257,14 @@ const handleSaveSettings: MessageHandler = async (data) => {
       enableReranking?: boolean;
     };
   };
-  const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
-
-  try {
-    // 确保数据目录存在
-    if (!fs.existsSync(STORAGE_CONFIG.dataDir)) {
-      fs.mkdirSync(STORAGE_CONFIG.dataDir, { recursive: true });
-    }
-
-    // 更新全局配置 - Chunking 策略
-    if (settings.chunkingStrategy === 'semantic') {
-      CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
-    } else {
-      CHUNKING_CONFIG.strategy = ChunkingStrategy.CHARACTER;
-    }
-
-    // 更新全局配置 - 上下文增强
-    if (typeof settings.enableContextEnhancement === 'boolean') {
-      CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
-      console.log('[Worker] 上下文增强已更新为:', CHUNKING_CONFIG.enableContextEnhancement);
-    }
-
-    // 更新全局配置 - 混合检索
-    if (typeof settings.enableHybridSearch === 'boolean') {
-      RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
-      console.log('[Worker] 混合检索已更新为:', RAG_CONFIG.enableHybridSearch);
-    }
-
-    // 更新全局配置 - 重排序
-    if (typeof settings.enableReranking === 'boolean') {
-      RAG_CONFIG.enableReranking = settings.enableReranking;
-      console.log('[Worker] 重排序已更新为:', RAG_CONFIG.enableReranking);
-    }
-
-    console.log('[Worker] Chunking 策略已更新为:', CHUNKING_CONFIG.strategy);
-
-    // 保存到文件
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-
-    return { success: true };
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error('[Worker] 保存设置失败:', error);
-    throw new Error(`保存设置失败: ${err.message}`);
-  }
+  saveSettings(settings);
+  return { success: true };
 };
 
 /** 计算向量位置处理器 (PCA 降维) */
 const handleCalculateVectorPositions: MessageHandler = async (data) => {
-  console.log('[Worker] handleCalculateVectorPositions triggered');
   const { query } = data as { query?: string };
-  const store = await getVectorStore();
-  const docs = await store.getAllVectors();
-  console.log(`[Worker] getAllVectors returned ${docs.length} documents`);
-
-  if (docs.length === 0) {
-    console.log('[Worker] No vectors found.');
-    return { points: [] };
-  }
-
-  // 准备数据矩阵
-  const vectors = docs.map((d) => d.vector);
-  let finalVectors = vectors;
-
-  // 如果有查询，计算查询向量并添加到矩阵末尾
-  let queryVector: number[] | null = null;
-  if (query) {
-    const { getEmbeddings } = await import('./model');
-    const embeddings = await getEmbeddings();
-    queryVector = await embeddings.embedQuery(query);
-    finalVectors = [...vectors, queryVector];
-  }
-
-  // 运行 PCA 降维 (384 -> 2)
-  console.log(`[Worker] 正在运行 PCA，数据量: ${finalVectors.length}`);
-  const pca = new PCA(finalVectors);
-  const predict = pca.predict(finalVectors, { nComponents: 2 });
-  const reducedData = predict.to2DArray();
-
-  // 映射回点对象
-  const points = docs.map((doc, i) => ({
-    x: reducedData[i][0],
-    y: reducedData[i][1],
-    text: doc.content,
-    isQuery: false,
-    id: doc.rowid,
-  }));
-
-  // 如果有查询点
-  if (queryVector) {
-    const queryPoint = reducedData[reducedData.length - 1];
-    points.push({
-      x: queryPoint[0],
-      y: queryPoint[1],
-      text: `查询: ${query}`,
-      isQuery: true,
-      id: -1,
-    });
-  }
-
-  return { points };
+  return calculateVectorPositions(query);
 };
 
 // ============ 消息处理器注册表 ============
