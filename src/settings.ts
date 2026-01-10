@@ -8,6 +8,7 @@ export interface AppSettings {
   enableContextEnhancement?: boolean;
   enableHybridSearch?: boolean;
   enableReranking?: boolean;
+  enableCRAG?: boolean;
 }
 
 export const getSettings = (): AppSettings => {
@@ -29,6 +30,7 @@ export const getSettings = (): AppSettings => {
     enableContextEnhancement: true,
     enableHybridSearch: false,
     enableReranking: false,
+    enableCRAG: false,
   };
 };
 
@@ -66,6 +68,12 @@ export const saveSettings = (settings: AppSettings): void => {
       console.log('[Settings] 重排序已更新为:', RAG_CONFIG.enableReranking);
     }
 
+    // 更新全局配置 - CRAG
+    if (typeof settings.enableCRAG === 'boolean') {
+      RAG_CONFIG.enableCRAG = settings.enableCRAG;
+      console.log('[Settings] CRAG 已更新为:', RAG_CONFIG.enableCRAG);
+    }
+
     console.log('[Settings] Chunking 策略已更新为:', CHUNKING_CONFIG.strategy);
 
     // 保存到文件
@@ -94,8 +102,12 @@ export const initSettings = () => {
   if (typeof settings.enableReranking === 'boolean') {
     RAG_CONFIG.enableReranking = settings.enableReranking;
   }
+  if (typeof settings.enableCRAG === 'boolean') {
+    RAG_CONFIG.enableCRAG = settings.enableCRAG;
+  }
   console.log('[Settings] 已加载保存的设置:', {
     reranking: RAG_CONFIG.enableReranking,
     hybrid: RAG_CONFIG.enableHybridSearch,
+    crag: RAG_CONFIG.enableCRAG,
   });
 };
