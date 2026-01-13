@@ -1,22 +1,28 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { v4 as uuidv4 } from 'uuid';
-
+import { randomUUID } from 'node:crypto';
 // Prompts
 const EXTRACT_PROMPT = `
 你是一个专业的知识提取专家。你的任务是阅读给定的 Markdown 文档，提取出核心知识点，并将其转化为“问题-答案”对 (QA Pairs)。
 
 要求：
-1. **全面性**：覆盖文档中的所有关键概念、操作步骤、配置项和注意事项。
-2. **独立性**：每个 QA 对必须是独立的，不需要依赖上下文即可理解。
-3. **准确性**：答案必须忠实于原文，不要通过臆测添加信息。
-4. **格式**：必须严格返回一个 JSON 数组，数组中每个对象包含 "question" 和 "answer" 两个字段。不要包含其他废话。
+1. **聚合与完整性（关键）**：不要将一个完整的逻辑或流程拆分成多个细碎的 QA。尽量将相关的步骤、原理解释、配置项合并到一个 QA 中。答案应该是一个完整的“小短文”，而不是一句话。
+2. **粒度控制**：专注于提取“如何做(How-to)”、“是什么(Concept)”、“为什么(Why)”等层面的知识。忽略琐碎的、显而易见的细节。
+3. **独立性**：每个 QA 对必须是独立的，不需要依赖上下文即可理解。即便是合并后的答案，也需要包含足够的背景信息。
+4. **准确性**：答案必须忠实于原文，不要通过臆测添加信息。
+5. **格式**：必须严格返回一个 JSON 数组，数组中每个对象包含 "question" 和 "answer" 两个字段。不要包含其他废话。
 
-示例输出格式：
-[
-  { "question": "如何启动服务？", "answer": "运行 npm start 命令即可启动服务。" },
-  { "question": "配置文件的路径在哪里？", "answer": "配置文件位于 src/config.ts。" }
-]
+示例（正确 vs 错误）：
+❌ 错误：
+Q: 如何启动？ A: 运行 npm start。
+Q: 启动前要干什么？ A: 要安装依赖。
+
+✅ 正确：
+Q: 如何部署和启动服务？
+A: 启动服务由以下步骤组成：
+1. 首先运行 \`npm install\` 安装依赖。
+2. 确保环境变量配置文件 \`.env\` 已创建。
+3. 最后运行 \`npm start\` 启动服务。
 `;
 
 const EXPAND_PROMPT = `
@@ -45,7 +51,7 @@ export interface ProcessedItem {
 }
 
 // 工具函数：安全的 JSON 解析
-const safeJsonParse = (text: string): any => {
+const safeJsonParse = (text: string): unknown => {
   try {
     // 移除 markdown 代码块标记
     let cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
@@ -144,7 +150,7 @@ export const processFileWithLLM = async (
     }
 
     results.push({
-      id: uuidv4(),
+      id: randomUUID(),
       original_text: qa.answer,
       primary_question: qa.question,
       augmented_questions: similarQueries,

@@ -189,64 +189,72 @@ export const loadAndSplit = async (filePath: string): Promise<Document[]> => {
     const semanticChunker = new SemanticChunker();
     splitDocs = await semanticChunker.splitDocuments(docs);
   } else if (strategy === ChunkingStrategy.LLM_ENHANCED) {
-    // LLM 增强导入
-    // 由于这里是在 worker 线程中，我们可以安全地导入和使用 LLM
-    const { getLLM } = await import('./model');
-    const { processFileWithLLM } = await import('./loader-llm');
-    const { LLMProvider } = await import('./config');
+    console.log('[Loader] 进入 LLM_ENHANCED 分支');
+    try {
+      console.log('[Loader] 正在导入模块...');
+      const { getLLM } = await import('./model');
+      const { processFileWithLLM } = await import('./loader-llm');
+      const { LLMProvider } = await import('./config');
 
-    // 使用 DeepSeek (或从配置获取)
-    const llm = getLLM(LLMProvider.DEEPSEEK);
+      console.log('[Loader] 正在初始化 LLM...');
+      const llm = getLLM(LLMProvider.DEEPSEEK);
 
-    // docs[0] 包含了整个文件内容
-    const fileContent = docs[0].pageContent;
-    const filename = path.basename(filePath);
+      const fileContent = docs[0].pageContent;
+      const filename = path.basename(filePath);
 
-    const processedItems = await processFileWithLLM(fileContent, llm, filename);
-
-    splitDocs = [];
-    for (const item of processedItems) {
-      // 策略：
-      // 我们希望根据“问题”来检索，但检索回来后显示的是“答案”。
-      // 我们在 utils.ts 中修改了 formatDocumentsAsString，优先使用 metadata.answer
-
-      // 1. 主问题文档
-      splitDocs.push(
-        new Document({
-          pageContent: item.primary_question,
-          metadata: {
-            ...docs[0].metadata, // 保留原有的 source 等元数据
-            answer: item.original_text,
-            type: 'qa_primary',
-            qa_id: item.id,
-          },
-        })
+      console.log(
+        `[Loader] 开始调用 processFileWithLLM, 文件: ${filename}, 长度: ${fileContent.length}`
       );
+      const processedItems = await processFileWithLLM(fileContent, llm, filename);
+      console.log(`[Loader] processFileWithLLM 完成, 获取到 ${processedItems.length} 个条目`);
 
-      // 2. 增强问题文档
-      for (const q of item.augmented_questions) {
+      splitDocs = [];
+      for (const item of processedItems) {
+        // 策略：
+        // 我们希望根据“问题”来检索，但检索回来后显示的是“答案”。
+        // 我们在 utils.ts 中修改了 formatDocumentsAsString，优先使用 metadata.answer
+
+        // 1. 主问题文档
         splitDocs.push(
           new Document({
-            pageContent: q,
+            pageContent: item.primary_question,
             metadata: {
-              ...docs[0].metadata,
+              ...docs[0].metadata, // 保留原有的 source 等元数据
               answer: item.original_text,
-              type: 'qa_augmented',
+              type: 'qa_primary',
               qa_id: item.id,
-              ref_question: item.primary_question,
             },
           })
         );
+
+        // 2. 增强问题文档
+        for (const q of item.augmented_questions) {
+          splitDocs.push(
+            new Document({
+              pageContent: q,
+              metadata: {
+                ...docs[0].metadata,
+                answer: item.original_text,
+                type: 'qa_augmented',
+                qa_id: item.id,
+                ref_question: item.primary_question,
+              },
+            })
+          );
+        }
+
+        // 3. 原始文本（可选，如果也想通过答案内容检索到）
+        // splitDocs.push(new Document({
+        //   pageContent: item.original_text,
+        //   metadata: { ...docs[0].metadata, answer: item.original_text, type: 'original' }
+        // }));
       }
 
-      // 3. 原始文本（可选，如果也想通过答案内容检索到）
-      // splitDocs.push(new Document({
-      //   pageContent: item.original_text,
-      //   metadata: { ...docs[0].metadata, answer: item.original_text, type: 'original' }
-      // }));
+      console.log(`[LLM Ingest] 生成了 ${splitDocs.length} 个检索向量文档`);
+    } catch (error: unknown) {
+      console.error('[Loader] LLM 处理过程中发生错误:', error);
+      throw error;
     }
-
-    console.log(`[LLM Ingest] 生成了 ${splitDocs.length} 个检索向量文档`);
   } else {
     // 字符递归分割（默认）
     const splitter = new RecursiveCharacterTextSplitter({

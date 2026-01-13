@@ -1,17 +1,11 @@
 import { parentPort } from 'node:worker_threads';
 import path from 'node:path';
-import fs from 'node:fs';
+// import fs from 'node:fs'; // Unused
 import { loadAndSplit } from './loader';
 import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from './sqliteStore';
 import { askQuestionStream } from './rag';
 import { createCRAGGraph } from './crag';
-import {
-  LLMProvider,
-  CHUNKING_CONFIG,
-  ChunkingStrategy,
-  STORAGE_CONFIG,
-  RAG_CONFIG,
-} from './config';
+import { LLMProvider, RAG_CONFIG } from './config';
 import type { Document } from '@langchain/core/documents';
 import type { ChatMessage } from './utils';
 

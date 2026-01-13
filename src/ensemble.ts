@@ -43,10 +43,12 @@ export class EnsembleRetriever extends BaseRetriever {
           rrfScoreMap.set(docId, { doc, score: 0 });
         }
 
-        const current = rrfScoreMap.get(docId)!;
-        // RRF 公式: score += weight / (c + rank)
-        // 注意: 这里的 rank 是从 0 开始的
-        current.score += weight / (this.c + rank + 1);
+        const current = rrfScoreMap.get(docId);
+        if (current) {
+          // RRF 公式: score += weight / (c + rank)
+          // 注意: 这里的 rank 是从 0 开始的
+          current.score += weight / (this.c + rank + 1);
+        }
       });
     });
 

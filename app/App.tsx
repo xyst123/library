@@ -81,8 +81,12 @@ const AppContent: React.FC = () => {
 
     // 监听模型下载进度
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleModelProgress = (_event: unknown, data: any) => {
+    const handleModelProgress = async (_event: unknown, data: any) => {
       const { status, progress, name, file } = data;
+      if (window.electronAPI) {
+        const settings = await window.electronAPI.getSettings();
+        if (!settings.enableReranking) return setModelDownloading(null);
+      }
       // 无论是 Reranker 还是 Embedding 模型，下载中都显示进度
       if (status === 'progress') {
         setModelDownloading(`正在下载 ${name || file}: ${Math.round(progress || 0)}%`);

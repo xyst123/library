@@ -160,6 +160,18 @@ export const Settings: React.FC<SettingsProps> = ({
                   </Text>
                 </Space>
               </Radio>
+
+              <Radio value="llm-enhanced">
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>LLM 智能提取（推荐）</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    利用 LLM 自动提取 &quot;问题-答案&quot; 对，并生成相似问题
+                  </Text>
+                  <Text type="warning" style={{ fontSize: '12px' }}>
+                    💡 需消耗 Token，适合构建高质量 FAQ 库
+                  </Text>
+                </Space>
+              </Radio>
             </Space>
           </Radio.Group>
         </Form.Item>

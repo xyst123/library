@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // Reranker 模型
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let rerankerModel: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let rerankerTokenizer: any = null;
 let rerankerInitPromise: Promise<void> | null = null;
 // Embedding 模型已移除（子进程仅用于 Rerank，节省内存）
@@ -46,6 +48,7 @@ const initReranker = async (): Promise<void> => {
       progress: 0,
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const progressCallback = (info: any) =>
       sendProgress({
         file: info.file,
@@ -77,13 +80,14 @@ const initReranker = async (): Promise<void> => {
       progress: 100,
     });
     console.log('[Reranker] 模型加载完成');
-  } catch (err: any) {
-    console.error('[Reranker] 初始化失败:', err);
+  } catch (err: unknown) {
+    const error = err as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    console.error('[Reranker] 初始化失败:', error);
     if (
-      err.message &&
-      (err.message.includes('Protobuf') ||
-        err.message.includes('out of bounds') ||
-        err.message.includes('Deserialize tensor'))
+      error.message &&
+      (error.message.includes('Protobuf') ||
+        error.message.includes('out of bounds') ||
+        error.message.includes('Deserialize tensor'))
     ) {
       console.log('[Reranker] 检测到缓存损坏 (Protobuf/Tensor)，清除后重试...');
       clearModelCache(RERANKING_CONFIG.model, 'Reranker');
@@ -147,7 +151,6 @@ process.on('message', async (msg: any) => {
       padding: true,
       truncation: true,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { logits } = await rerankerModel(inputs);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,7 +174,7 @@ process.on('message', async (msg: any) => {
         .join(', ')}...)`
     );
     send('rerank-result', { id, scores });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Reranker] 推理失败:', error);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     send('rerank-error', { id, error: (error as any).message });
