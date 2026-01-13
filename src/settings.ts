@@ -44,8 +44,10 @@ export const saveSettings = (settings: AppSettings): void => {
     }
 
     // 更新全局配置 - Chunking 策略
-    if (settings.chunkingStrategy === 'semantic') {
+    if (settings.chunkingStrategy === ChunkingStrategy.SEMANTIC) {
       CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
+    } else if (settings.chunkingStrategy === ChunkingStrategy.LLM_ENHANCED) {
+      CHUNKING_CONFIG.strategy = ChunkingStrategy.LLM_ENHANCED;
     } else {
       CHUNKING_CONFIG.strategy = ChunkingStrategy.CHARACTER;
     }
@@ -90,8 +92,10 @@ export const initSettings = () => {
   const settings = getSettings();
 
   // Apply settings to global config on init
-  if (settings.chunkingStrategy === 'semantic') {
+  if (settings.chunkingStrategy === ChunkingStrategy.SEMANTIC) {
     CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
+  } else if (settings.chunkingStrategy === ChunkingStrategy.LLM_ENHANCED) {
+    CHUNKING_CONFIG.strategy = ChunkingStrategy.LLM_ENHANCED;
   }
   if (typeof settings.enableContextEnhancement === 'boolean') {
     CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;

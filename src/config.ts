@@ -61,6 +61,7 @@ export const STORAGE_CONFIG = {
 export enum ChunkingStrategy {
   CHARACTER = 'character', // 字符递归分割
   SEMANTIC = 'semantic', // 语义分割
+  LLM_ENHANCED = 'llm-enhanced', // LLM 智能提取
 }
 
 /** Chunking 相关配置 */

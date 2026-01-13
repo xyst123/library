@@ -12,5 +12,5 @@ export const formatHistory = (history: ChatMessage[]): string => {
 };
 
 export const formatDocumentsAsString = (documents: Document[]): string => {
-  return documents.map((doc) => doc.pageContent).join('\n\n');
+  return documents.map((doc) => doc.metadata.answer || doc.pageContent).join('\n\n');
 };
