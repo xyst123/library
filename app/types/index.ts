@@ -39,6 +39,7 @@ export interface AppSettings {
   enableHybridSearch: boolean;
   enableReranking?: boolean;
   enableCRAG?: boolean;
+  enableSummaryMemory?: boolean;
 }
 
 /** 历史消息格式（用于 IPC 传输） */
