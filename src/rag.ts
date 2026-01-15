@@ -10,6 +10,7 @@ import { RAG_CONFIG } from './config';
 import type { ChatMessage } from './utils';
 import { formatHistory, formatDocumentsAsString } from './utils';
 import { weatherCardTool } from './tools/weather';
+import { generateSummary } from './memory';
 
 // 简单的 embedding 缓存 (LRU 风格)
 const CACHE_SIZE = 50;
@@ -165,8 +166,29 @@ export const askQuestionStream = async (
 
   // 3. 构建 Prompt
   const context = formatDocumentsAsString(docs);
-  // 使用配置的历史记录限制
-  const chatHistory = formatHistory(history.slice(-RAG_CONFIG.historyLimit));
+
+  // 处理历史记录与摘要
+  let chatHistoryStr = '';
+  let summaryStr = '';
+
+  if (RAG_CONFIG.enableSummaryMemory && history.length > RAG_CONFIG.historyLimit) {
+    // 分割历史：旧记录用于摘要，新记录作为上下文
+    const splitIndex = history.length - RAG_CONFIG.historyLimit;
+    const historyToSummarize = history.slice(0, splitIndex);
+    const recentHistory = history.slice(splitIndex);
+
+    console.log(`[RAG] 启用摘要记忆：正在摘要前 ${historyToSummarize.length} 条记录`);
+
+    // 生成摘要 (TODO: 生产环境应持久化 currentSummary，这里简化为每次重新生成或基于空生成)
+    // 这里的简化逻辑是：每次都重新摘要 "超出的部分"。
+    // 更好的做法是：内存中维护一个 currentSummary，每次追加。
+    // 鉴于 worker 无状态，我们暂且每次摘要 "被切出去的部分"。
+    summaryStr = await generateSummary(historyToSummarize, '', provider);
+    chatHistoryStr = formatHistory(recentHistory);
+  } else {
+    // 未启用或未超限：使用标准截断
+    chatHistoryStr = formatHistory(history.slice(-RAG_CONFIG.historyLimit));
+  }
 
   const template = `你是本地知识库助手。你同时拥有通用知识。
 请优先根据以下【上下文】和【对话历史】来回答问题。
@@ -177,6 +199,9 @@ export const askQuestionStream = async (
 
 上下文:
 {context}
+
+【长期记忆摘要】:
+{summary}
 
 对话历史:
 {chat_history}
@@ -194,7 +219,8 @@ export const askQuestionStream = async (
   const rawStream = await chain.stream(
     {
       context,
-      chat_history: chatHistory,
+      summary: summaryStr || '无',
+      chat_history: chatHistoryStr,
       question,
     },
     { signal }

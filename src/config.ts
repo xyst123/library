@@ -103,6 +103,8 @@ export const RAG_CONFIG = {
   enableCRAG: false,
   /** 是否启用网络搜索 (CRAG 回退机制) */
   enableWebSearch: false,
+  /** 是否启用摘要记忆 (Summary Memory) */
+  enableSummaryMemory: false,
 };
 
 /** Reranking 模型配置 */

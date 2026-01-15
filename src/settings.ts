@@ -9,10 +9,74 @@ export interface AppSettings {
   enableHybridSearch?: boolean;
   enableReranking?: boolean;
   enableCRAG?: boolean;
+  enableSummaryMemory?: boolean;
+}
+const SETTINGS_FILENAME = 'settings.json';
+
+/** 配置值类型枚举 */
+enum SettingType {
+  STRING = 'string',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  OBJECT = 'object',
 }
 
+/** 布尔类型配置项映射定义 */
+interface BooleanConfig {
+  key: keyof AppSettings;
+  updateFn: (val: boolean) => void;
+  label?: string;
+}
+
+/** 全局布尔配置项列表 */
+const BOOLEAN_SETTINGS: BooleanConfig[] = [
+  {
+    key: 'enableContextEnhancement',
+    updateFn: (val) => (CHUNKING_CONFIG.enableContextEnhancement = val),
+    label: '上下文增强',
+  },
+  {
+    key: 'enableHybridSearch',
+    updateFn: (val) => (RAG_CONFIG.enableHybridSearch = val),
+    label: '混合检索',
+  },
+  {
+    key: 'enableReranking',
+    updateFn: (val) => (RAG_CONFIG.enableReranking = val),
+    label: '重排序',
+  },
+  {
+    key: 'enableCRAG',
+    updateFn: (val) => (RAG_CONFIG.enableCRAG = val),
+    label: 'CRAG',
+  },
+  {
+    key: 'enableSummaryMemory',
+    updateFn: (val) => (RAG_CONFIG.enableSummaryMemory = val),
+    label: '摘要记忆',
+  },
+];
+
+/**
+ * 辅助函数：根据类型更新配置并可选地打印日志
+ * 支持 boolean, string, number 等
+ */
+const applySetting = <T>(
+  value: T | undefined,
+  expectedType: SettingType,
+  updateFn: (val: T) => void,
+  logLabel?: string
+) => {
+  if (typeof value === expectedType) {
+    updateFn(value as T);
+    if (logLabel) {
+      console.log(`[Settings] ${logLabel}已更新为:`, value);
+    }
+  }
+};
+
 export const getSettings = (): AppSettings => {
-  const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
+  const settingsPath = path.join(STORAGE_CONFIG.dataDir, SETTINGS_FILENAME);
 
   try {
     if (fs.existsSync(settingsPath)) {
@@ -31,11 +95,12 @@ export const getSettings = (): AppSettings => {
     enableHybridSearch: false,
     enableReranking: false,
     enableCRAG: false,
+    enableSummaryMemory: false,
   };
 };
 
 export const saveSettings = (settings: AppSettings): void => {
-  const settingsPath = path.join(STORAGE_CONFIG.dataDir, 'settings.json');
+  const settingsPath = path.join(STORAGE_CONFIG.dataDir, SETTINGS_FILENAME);
 
   try {
     // 确保数据目录存在
@@ -44,37 +109,25 @@ export const saveSettings = (settings: AppSettings): void => {
     }
 
     // 更新全局配置 - Chunking 策略
-    if (settings.chunkingStrategy === ChunkingStrategy.SEMANTIC) {
-      CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
-    } else if (settings.chunkingStrategy === ChunkingStrategy.LLM_ENHANCED) {
-      CHUNKING_CONFIG.strategy = ChunkingStrategy.LLM_ENHANCED;
-    } else {
-      CHUNKING_CONFIG.strategy = ChunkingStrategy.CHARACTER;
-    }
+    applySetting(
+      settings.chunkingStrategy,
+      SettingType.STRING,
+      (val) => {
+        if (val === ChunkingStrategy.SEMANTIC) {
+          CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
+        } else if (val === ChunkingStrategy.LLM_ENHANCED) {
+          CHUNKING_CONFIG.strategy = ChunkingStrategy.LLM_ENHANCED;
+        } else {
+          CHUNKING_CONFIG.strategy = ChunkingStrategy.CHARACTER;
+        }
+      },
+      'Chunking 策略'
+    );
 
-    // 更新全局配置 - 上下文增强
-    if (typeof settings.enableContextEnhancement === 'boolean') {
-      CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
-      console.log('[Settings] 上下文增强已更新为:', CHUNKING_CONFIG.enableContextEnhancement);
-    }
-
-    // 更新全局配置 - 混合检索
-    if (typeof settings.enableHybridSearch === 'boolean') {
-      RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
-      console.log('[Settings] 混合检索已更新为:', RAG_CONFIG.enableHybridSearch);
-    }
-
-    // 更新全局配置 - 重排序
-    if (typeof settings.enableReranking === 'boolean') {
-      RAG_CONFIG.enableReranking = settings.enableReranking;
-      console.log('[Settings] 重排序已更新为:', RAG_CONFIG.enableReranking);
-    }
-
-    // 更新全局配置 - CRAG
-    if (typeof settings.enableCRAG === 'boolean') {
-      RAG_CONFIG.enableCRAG = settings.enableCRAG;
-      console.log('[Settings] CRAG 已更新为:', RAG_CONFIG.enableCRAG);
-    }
+    // 循环更新所有布尔配置
+    BOOLEAN_SETTINGS.forEach(({ key, updateFn, label }) => {
+      applySetting(settings[key] as boolean | undefined, SettingType.BOOLEAN, updateFn, label);
+    });
 
     console.log('[Settings] Chunking 策略已更新为:', CHUNKING_CONFIG.strategy);
 
@@ -92,26 +145,23 @@ export const initSettings = () => {
   const settings = getSettings();
 
   // Apply settings to global config on init
-  if (settings.chunkingStrategy === ChunkingStrategy.SEMANTIC) {
-    CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
-  } else if (settings.chunkingStrategy === ChunkingStrategy.LLM_ENHANCED) {
-    CHUNKING_CONFIG.strategy = ChunkingStrategy.LLM_ENHANCED;
-  }
-  if (typeof settings.enableContextEnhancement === 'boolean') {
-    CHUNKING_CONFIG.enableContextEnhancement = settings.enableContextEnhancement;
-  }
-  if (typeof settings.enableHybridSearch === 'boolean') {
-    RAG_CONFIG.enableHybridSearch = settings.enableHybridSearch;
-  }
-  if (typeof settings.enableReranking === 'boolean') {
-    RAG_CONFIG.enableReranking = settings.enableReranking;
-  }
-  if (typeof settings.enableCRAG === 'boolean') {
-    RAG_CONFIG.enableCRAG = settings.enableCRAG;
-  }
+  applySetting(settings.chunkingStrategy, SettingType.STRING, (val) => {
+    if (val === ChunkingStrategy.SEMANTIC) {
+      CHUNKING_CONFIG.strategy = ChunkingStrategy.SEMANTIC;
+    } else if (val === ChunkingStrategy.LLM_ENHANCED) {
+      CHUNKING_CONFIG.strategy = ChunkingStrategy.LLM_ENHANCED;
+    }
+  });
+
+  // 循环初始化所有布尔配置
+  BOOLEAN_SETTINGS.forEach(({ key, updateFn }) => {
+    applySetting(settings[key] as boolean | undefined, SettingType.BOOLEAN, updateFn);
+  });
+
   console.log('[Settings] 已加载保存的设置:', {
     reranking: RAG_CONFIG.enableReranking,
     hybrid: RAG_CONFIG.enableHybridSearch,
     crag: RAG_CONFIG.enableCRAG,
+    summary: RAG_CONFIG.enableSummaryMemory,
   });
 };

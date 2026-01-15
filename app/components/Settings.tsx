@@ -13,6 +13,7 @@ interface SettingsData {
   enableHybridSearch?: boolean;
   enableReranking?: boolean;
   enableCRAG?: boolean;
+  enableSummaryMemory?: boolean;
 }
 
 interface SettingsProps {
@@ -35,6 +36,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [enableHybridSearch, setEnableHybridSearch] = useState<boolean>(false);
   const [enableReranking, setEnableReranking] = useState<boolean>(false);
   const [enableCRAG, setEnableCRAG] = useState<boolean>(false);
+  const [enableSummaryMemory, setEnableSummaryMemory] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
 
   // 加载当前配置
@@ -57,6 +59,7 @@ export const Settings: React.FC<SettingsProps> = ({
         setEnableHybridSearch(settings.enableHybridSearch ?? false);
         setEnableReranking(settings.enableReranking ?? false);
         setEnableCRAG(settings.enableCRAG ?? false);
+        setEnableSummaryMemory(settings.enableSummaryMemory ?? false);
       }
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -73,6 +76,7 @@ export const Settings: React.FC<SettingsProps> = ({
       enableHybridSearch,
       enableReranking,
       enableCRAG,
+      enableSummaryMemory,
     };
     try {
       await window.electronAPI.saveSettings(settings);
@@ -316,6 +320,45 @@ export const Settings: React.FC<SettingsProps> = ({
                   <Text strong>禁用</Text>
                   <Text type="secondary" style={{ fontSize: '12px' }}>
                     标准 RAG 流程
+                  </Text>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Divider />
+
+        {/* 摘要记忆开关 */}
+        <Form.Item
+          label="对话摘要记忆 (Summary Memory)"
+          extra={
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              自动摘要早期对话历史，解决&quot;长对话失忆&quot;问题，节省 Token
+            </Text>
+          }
+        >
+          <Radio.Group
+            value={enableSummaryMemory}
+            onChange={(e) => setEnableSummaryMemory(e.target.value)}
+          >
+            <Space orientation="vertical">
+              <Radio value={true}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>启用 (推荐)</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    超过历史限制时，将旧对话压缩成摘要保留
+                  </Text>
+                  <Text type="warning" style={{ fontSize: '12px' }}>
+                    💡 每次超限会触发额外的 LLM 摘要生成
+                  </Text>
+                </Space>
+              </Radio>
+              <Radio value={false}>
+                <Space orientation="vertical" style={{ marginLeft: 8 }}>
+                  <Text strong>禁用</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    直接丢弃超出限制的历史对话
                   </Text>
                 </Space>
               </Radio>

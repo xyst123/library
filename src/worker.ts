@@ -33,6 +33,7 @@ type WorkerMessage =
         enableContextEnhancement?: boolean;
         enableHybridSearch?: boolean;
         enableReranking?: boolean;
+        enableSummaryMemory?: boolean;
       };
     };
 
@@ -273,6 +274,7 @@ const handleSaveSettings: MessageHandler = async (data) => {
       enableContextEnhancement?: boolean;
       enableHybridSearch?: boolean;
       enableReranking?: boolean;
+      enableSummaryMemory?: boolean;
     };
   };
   saveSettings(settings);
