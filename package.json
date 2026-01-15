@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && cross-env ELECTRON_RUN_AS_NODE= electron .",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
     "build": "vite build",
     "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
