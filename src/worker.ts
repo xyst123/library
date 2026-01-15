@@ -1,6 +1,5 @@
 import { parentPort } from 'node:worker_threads';
 import path from 'node:path';
-// import fs from 'node:fs'; // Unused
 import { loadAndSplit } from './loader';
 import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from './sqliteStore';
 import { askQuestionStream } from './rag';
