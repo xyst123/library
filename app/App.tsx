@@ -19,6 +19,8 @@ import {
   SettingOutlined,
   MessageOutlined,
   ExperimentOutlined,
+  AudioOutlined,
+  PaperClipOutlined,
 } from '@ant-design/icons';
 import { FileList, MessageItem, Settings, ErrorBoundary, VectorMap } from './components';
 import { useChat } from './hooks';
@@ -362,8 +364,12 @@ const AppContent: React.FC = () => {
                 style={{
                   flex: 1,
                   overflow: 'auto',
-                  marginBottom: 16,
-                  padding: '8px 0',
+                  marginBottom: 0,
+                  padding: '24px 48px 120px 48px', // 底部留白，为悬浮输入框预留空间
+                  maxWidth: '1200px', // 更宽的视野
+                  width: '100%',
+                  margin: '0 auto',
+                  zIndex: 0,
                 }}
               >
                 {messages.length === 0 ? (
@@ -374,24 +380,35 @@ const AppContent: React.FC = () => {
                         在左侧上传文档，然后在这里开始提问
                       </Text>
                     }
-                    style={{ marginTop: 100 }}
+                    style={{ marginTop: 150 }}
                   />
                 ) : (
-                  messages.map((msg, index) => <MessageItem key={index} message={msg} />)
+                  messages.map((msg, index) => (
+                    <MessageItem
+                      key={index}
+                      message={msg}
+                      isStreaming={
+                        loading && index === messages.length - 1 && msg.role === 'assistant'
+                      }
+                    />
+                  ))
                 )}
 
                 {loading && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 12 }}>
                     <Card
                       size="small"
                       style={{
-                        background: colors.background.overlay,
+                        background: colors.background.pill, // 使用新的药丸背景常量
                         border: `1px solid ${colors.border.light}`,
+                        backdropFilter: 'blur(10px)',
                       }}
                     >
                       <Space>
                         <Spin size="small" />
-                        <Text style={{ color: colors.text.secondary }}>思考中...</Text>
+                        <Text style={{ color: colors.text.secondary }} className="streaming-cursor">
+                          AI 正在思考
+                        </Text>
                       </Space>
                     </Card>
                   </div>
@@ -399,39 +416,53 @@ const AppContent: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* 渐变过渡层 */}
+              {/* 输入区域 - 悬浮胶囊 */}
               <div
                 style={{
                   position: 'absolute',
-                  bottom: '0',
+                  bottom: 30,
                   left: 0,
                   right: 0,
-                  height: `${UI_CONSTANTS.GRADIENT_HEIGHT}px`,
-                  background:
-                    'linear-gradient(to bottom, rgba(10, 15, 30, 0) 0%, rgba(10, 15, 30, 0.85) 15%, rgba(10, 15, 30, 0.93) 30%, rgba(10, 15, 30, 0.96) 50%, rgba(10, 15, 30, 0.98) 70%, rgba(10, 15, 30, 0.99) 85%, rgba(10, 15, 30, 1) 100%)',
-                  pointerEvents: 'none',
-                  zIndex: 1,
+                  zIndex: 100,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  pointerEvents: 'none', // 允许点击穿透到背后/两侧的内容
                 }}
-              />
-
-              {/* 输入区域 */}
-              <div
-                style={{ padding: '0', position: 'relative', zIndex: 2 }}
-                onKeyDown={handleKeyDown}
               >
-                <Sender
-                  className="tech-sender"
-                  value={input}
-                  onChange={setInput}
-                  onSubmit={() => {
-                    handleSend();
+                <div
+                  className="tech-input-pill"
+                  style={{
+                    width: '90%',
+                    maxWidth: '800px',
+                    pointerEvents: 'auto', // 重新启用输入框本身的指针事件
                   }}
-                  onCancel={stopGeneration}
-                  loading={loading}
-                  disabled={!!modelDownloading}
-                  placeholder={modelDownloading || '输入你的问题，按 Enter 发送（↑ 历史问题）...'}
-                  style={{ width: '100%' }}
-                />
+                  onKeyDown={handleKeyDown}
+                >
+                  <Button
+                    type="text"
+                    icon={<AudioOutlined style={{ fontSize: 18, color: colors.primary }} />}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Button
+                    type="text"
+                    icon={<PaperClipOutlined style={{ fontSize: 18, color: colors.secondary }} />} // 电子紫
+                    onClick={handleUpload}
+                    style={{ marginRight: 8 }}
+                  />
+
+                  <div style={{ flex: 1 }}>
+                    <Sender
+                      className="tech-sender"
+                      value={input}
+                      onChange={setInput}
+                      onSubmit={handleSend}
+                      onCancel={stopGeneration}
+                      loading={loading}
+                      disabled={!!modelDownloading}
+                      placeholder={modelDownloading || '输入你的问题...'}
+                    />
+                  </div>
+                </div>
               </div>
             </>
           )}

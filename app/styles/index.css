@@ -1,12 +1,13 @@
 :root {
-  --tech-primary: #1dd1f7;
-  --tech-secondary: #bd00ff;
-  --tech-bg-start: #0f172a;
-  --tech-bg-end: #020617;
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur: 20px;
-  --neon-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+  --tech-primary: #00f3ff; /* 霓虹青 */
+  --tech-secondary: #bd00ff; /* 电子紫 */
+  --tech-bg-start: #050b14; /* 深邃星空蓝/黑 */
+  --tech-bg-end: #000000;
+  --glass-bg: rgba(10, 15, 30, 0.4);
+  --glass-border: rgba(0, 243, 255, 0.15);
+  --glass-blur: 25px;
+  --neon-shadow: 0 0 15px rgba(0, 243, 255, 0.25);
+  --pill-bg: rgba(10, 15, 30, 0.6);
 }
 
 * {
@@ -24,8 +25,16 @@ body,
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: radial-gradient(circle at top left, #1e1b4b, #0f172a, #000000);
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  background: radial-gradient(circle at 50% -20%, #1e1b4b, #020617 60%, #000000);
   color: #e2e8f0;
 }
 
@@ -40,17 +49,19 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 243, 255, 0.1);
   border-radius: 3px;
+  transition: background 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 243, 255, 0.3);
+  box-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
 }
 
 /* 科技感工具类 (Tech Utilities) */
 .tech-layout-bg {
-  background: transparent !important; /* 让 body 的渐变透出来 */
+  background: transparent !important;
 }
 
 .tech-glass {
@@ -60,97 +71,110 @@ body {
   border: 1px solid var(--glass-border);
 }
 
+/* 带毛玻璃效果的顶部和侧边栏 */
 .tech-header {
   border-bottom: 1px solid var(--glass-border) !important;
-  background: rgba(15, 23, 42, 0.6) !important; /* 稍微深一点以便阅读 */
-  backdrop-filter: blur(10px);
+  background: rgba(5, 11, 20, 0.3) !important;
+  backdrop-filter: blur(var(--glass-blur));
 }
 
 .tech-sider {
   border-right: 1px solid var(--glass-border) !important;
-  background: rgba(15, 23, 42, 0.4) !important;
+  background: rgba(5, 11, 20, 0.2) !important;
+  backdrop-filter: blur(10px);
 }
 
 .tech-text-primary {
   color: var(--tech-primary) !important;
-  text-shadow: 0 0 8px rgba(0, 243, 255, 0.3);
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
 }
 
 .tech-text-secondary {
   color: var(--tech-secondary) !important;
+  text-shadow: 0 0 10px rgba(189, 0, 255, 0.4);
 }
 
-/* Antd 覆盖样式 - 科技风 */
+/* 赛博朋克风格的 Antd 样式微调 */
 .ant-card {
-  background: var(--glass-bg) !important;
+  background: rgba(15, 23, 42, 0.4) !important;
   border: 1px solid var(--glass-border) !important;
-  border-radius: 12px !important;
+  border-radius: 16px !important;
   color: #fff !important;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.ant-card:hover {
+  border-color: var(--tech-primary) !important;
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
 }
 
 .ant-btn-primary {
   background: linear-gradient(135deg, var(--tech-primary) 0%, #2563eb 100%) !important;
   border: none !important;
-  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-  color: #000 !important; /* 亮色背景配深色文字 */
-  font-weight: 600;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+  color: #000 !important;
+  font-weight: 700;
+  border-radius: 8px;
 }
 
 .ant-btn-primary:hover {
   background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%) !important;
-  box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+  box-shadow: 0 0 25px rgba(0, 243, 255, 0.6);
 }
 
-.ant-btn-text, .ant-btn-default {
+.ant-btn-text {
   color: #94a3b8 !important;
+  transition: all 0.3s;
 }
+
 .ant-btn-text:hover {
   background: rgba(255, 255, 255, 0.05) !important;
   color: var(--tech-primary) !important;
+  text-shadow: 0 0 8px var(--tech-primary);
 }
 
+/* 输入框样式 */
 .ant-input,
 .ant-input-textarea textarea,
 .ant-input-affix-wrapper {
-  background: rgba(0, 0, 0, 0.3) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
   border: 1px solid var(--glass-border) !important;
   color: #fff !important;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(10px);
 }
 
-.ant-input:focus,
-.ant-input-textarea textarea:focus,
-.ant-input-affix-wrapper:focus,
-.ant-input-affix-wrapper-focused {
-  border-color: var(--tech-primary) !important;
-  box-shadow: 0 0 0 2px rgba(0, 243, 255, 0.1) !important;
+.ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
-.ant-select-selector {
-  background: rgba(0, 0, 0, 0.3) !important;
-  border: 1px solid var(--glass-border) !important;
-  color: #fff !important;
+/* 悬浮药丸输入框容器 */
+.tech-input-pill {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  background: var(--pill-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 9999px; /* 药丸形状 */
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 30px rgba(0, 243, 255, 0.1),
+    inset 0 0 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
 }
 
-.ant-select-arrow {
-  color: var(--tech-primary) !important;
+.tech-input-pill:focus-within {
+  border-color: var(--tech-primary);
+  box-shadow:
+    0 0 40px rgba(0, 243, 255, 0.2),
+    inset 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
-.ant-typography {
-  color: #e2e8f0 !important;
-}
-
-.ant-spin-dot-item {
-  background-color: var(--tech-primary) !important;
-}
-
-
-
-.tech-content {
-  background: rgba(0, 0, 0, 0.2) !important;
-  backdrop-filter: blur(5px);
-}
-
+/* 药丸内的自定义发送器 */
 .tech-sender .ant-input,
 .tech-sender .ant-input-wrapper,
 .tech-sender .ant-sender-content,
@@ -158,6 +182,9 @@ body {
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
+  padding: 0 !important;
+  resize: none !important;
+  min-height: 24px !important;
 }
 
 .tech-sender .ant-input:focus {
@@ -165,3 +192,55 @@ body {
   box-shadow: none !important;
 }
 
+/* 内容区域 */
+.tech-content {
+  background: transparent !important;
+}
+
+/* 引用/来源高亮 */
+.tech-citation {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 243, 255, 0.1);
+  border: 1px solid var(--tech-primary);
+  color: var(--tech-primary);
+  font-size: 10px;
+  margin: 0 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  vertical-align: text-top;
+}
+
+.tech-citation:hover {
+  background: var(--tech-primary);
+  color: #000;
+  box-shadow: 0 0 10px var(--tech-primary);
+}
+
+/* 打字/流式动画 */
+@keyframes glow-pulse {
+  0% {
+    opacity: 1;
+    text-shadow: 0 0 5px var(--tech-primary);
+  }
+  50% {
+    opacity: 0.5;
+    text-shadow: 0 0 2px var(--tech-primary);
+  }
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 5px var(--tech-primary);
+  }
+}
+
+.streaming-cursor::after {
+  content: '▋';
+  color: var(--tech-primary);
+  animation: glow-pulse 1s infinite;
+  display: inline-block;
+  margin-left: 2px;
+}

@@ -1,5 +1,5 @@
 import React, { memo, useCallback } from 'react';
-import { Card, Space, Typography, Collapse, Button, message as antdMessage } from 'antd';
+import { Card, Space, Typography, Button, message as antdMessage, Popover, Tag } from 'antd';
 import { RobotOutlined, UserOutlined, CopyOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -13,18 +13,21 @@ const { Text } = Typography;
 
 interface MessageItemProps {
   message: Message;
+  isStreaming?: boolean;
 }
 
-const AssistantContent: React.FC<{ content: string; toolCalls?: ToolCall[] }> = memo(
-  ({ content, toolCalls }) => (
-    <div className="assistant-content">
-      <div className="markdown-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-      </div>
-      {toolCalls?.map((toolCall, idx) => renderComponent(toolCall.name, toolCall.args, idx))}
+const AssistantContent: React.FC<{
+  content: string;
+  toolCalls?: ToolCall[];
+  isStreaming?: boolean;
+}> = memo(({ content, toolCalls, isStreaming }) => (
+  <div className={`assistant-content ${isStreaming ? 'streaming-active' : ''}`}>
+    <div className="markdown-content">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
-  )
-);
+    {toolCalls?.map((toolCall, idx) => renderComponent(toolCall.name, toolCall.args, idx))}
+  </div>
+));
 
 AssistantContent.displayName = 'AssistantContent';
 
@@ -33,7 +36,7 @@ AssistantContent.displayName = 'AssistantContent';
  * 展示用户或助手的消息，包含参考来源
  * 助手消息支持 Markdown 和自定义组件渲染
  */
-const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
+const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) => {
   const isUser = message.role === 'user';
 
   const handleCopy = useCallback(() => {
@@ -55,94 +58,128 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
         size="small"
         style={{
           maxWidth: UI_CONSTANTS.MAX_MESSAGE_WIDTH,
-          background: isUser ? colors.gradient.user : colors.background.overlay,
+          background: isUser ? colors.gradient.user : colors.background.overlay, // 毛玻璃背景
           border: isUser ? 'none' : `1px solid ${colors.border.light}`,
           color: isUser ? colors.text.dark : colors.text.primary,
+          backdropFilter: 'blur(10px)',
         }}
       >
         <Space orientation="vertical" style={{ width: '100%' }}>
           <Space align="start">
-            {!isUser && <RobotOutlined style={{ color: '#1dd1f7', fontSize: 16 }} />}
+            {!isUser && <RobotOutlined style={{ color: colors.primary, fontSize: 16 }} />}
 
             {/* 用户消息直接显示，助手消息使用混合渲染 */}
             {isUser ? (
               <Text style={{ color: '#fff', whiteSpace: 'pre-wrap' }}>{message.content}</Text>
             ) : (
-              <AssistantContent content={message.content} toolCalls={message.toolCalls} />
+              <AssistantContent
+                content={message.content}
+                toolCalls={message.toolCalls}
+                isStreaming={isStreaming} // 通过父组件属性传递
+              />
             )}
 
             {isUser && <UserOutlined style={{ color: '#fff', fontSize: 16 }} />}
           </Space>
 
-          {/* 参考来源 */}
+          {/* 参考来源 - 交互式卡片 */}
           {message.sources && message.sources.length > 0 && (
             <div
               style={{
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: '1px solid rgba(255,255,255,0.1)',
+                marginTop: 12,
+                paddingTop: 12,
+                borderTop: `1px solid ${colors.background.code}`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
               }}
             >
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
-                参考来源 ({message.sources.length} 个分块):
+              <Text type="secondary" style={{ fontSize: 12, color: colors.text.muted }}>
+                参考 {message.sources.length} 个文档片段:
               </Text>
-              <Collapse
-                ghost
-                size="small"
+
+              <div
                 style={{
-                  background: 'transparent',
-                  border: 'none',
+                  display: 'flex',
+                  gap: 8,
+                  overflowX: 'auto',
+                  paddingBottom: 4,
+                  scrollbarWidth: 'none', // 隐藏滚动条以保持界面整洁
                 }}
-                items={message.sources.map((s, idx) => ({
-                  key: idx,
-                  label: (
-                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
-                      分块 {idx + 1}: {s.source.split('/').pop()}
-                      {s.score && (
-                        <span style={{ marginLeft: 8, color: colors.primary }}>
-                          相似度: {(1 - s.score).toFixed(3)}
-                        </span>
-                      )}
-                    </Text>
-                  ),
-                  style: {
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  },
-                  children: (
-                    <div
-                      style={{
-                        background: 'rgba(0,0,0,0.2)',
-                        padding: '8px 12px',
-                        borderRadius: 4,
-                        maxHeight: 200,
-                        overflow: 'auto',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: 'rgba(255,255,255,0.7)',
-                          fontSize: 11,
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        {s.content}
-                      </Text>
+              >
+                {message.sources.map((s, idx) => (
+                  <Popover
+                    key={idx}
+                    title={
                       <div
                         style={{
-                          marginTop: 8,
-                          paddingTop: 8,
-                          borderTop: '1px solid rgba(255,255,255,0.05)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                         }}
                       >
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>
-                          字符数: {s.content.length}
+                        <Text strong style={{ color: colors.primary }}>
+                          [{idx + 1}] {s.source.split('/').pop()}
+                        </Text>
+                        {s.score && (
+                          <Tag color="blue" variant="filled">
+                            {(1 - s.score).toFixed(2)}
+                          </Tag>
+                        )}
+                      </div>
+                    }
+                    content={
+                      <div style={{ maxWidth: 300, maxHeight: 400, overflow: 'auto' }}>
+                        <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
+                          {s.content}
                         </Text>
                       </div>
+                    }
+                    overlayInnerStyle={{
+                      background: 'rgba(10, 15, 30, 0.95)',
+                      backdropFilter: 'blur(10px)',
+                      border: `1px solid ${colors.border.light}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        minWidth: 120,
+                        maxWidth: 160,
+                        padding: '8px 12px',
+                        background: colors.background.overlay,
+                        border: `1px solid ${colors.border.light}`,
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontSize: 12,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = colors.background.hover.primary;
+                        e.currentTarget.style.borderColor = colors.primary;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = colors.background.overlay;
+                        e.currentTarget.style.borderColor = colors.border.light;
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                        <span className="tech-citation" style={{ marginRight: 6 }}>
+                          {idx + 1}
+                        </span>
+                        <Text ellipsis style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
+                          {s.source.split('/').pop()}
+                        </Text>
+                      </div>
+                      <Text
+                        ellipsis
+                        style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, display: 'block' }}
+                      >
+                        {s.content.substring(0, 30)}...
+                      </Text>
                     </div>
-                  ),
-                }))}
-              />
+                  </Popover>
+                ))}
+              </div>
             </div>
           )}
 
@@ -155,7 +192,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message }) => {
                 icon={<CopyOutlined />}
                 onClick={handleCopy}
                 style={{
-                  color: 'rgba(255,255,255,0.5)',
+                  color: colors.text.muted,
                   fontSize: '12px',
                 }}
                 title="复制回答"
