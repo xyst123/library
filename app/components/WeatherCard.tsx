@@ -1,6 +1,6 @@
 import type React from 'react';
 import { Card, Space, Typography } from 'antd';
-import { colors } from '../theme/colors';
+import { colors } from '@/theme/colors';
 import './WeatherCard.css';
 
 const { Text, Title } = Typography;

@@ -1,6 +1,6 @@
 import type React from 'react';
-import WeatherCard from './WeatherCard';
-import type { WeatherCardProps } from './WeatherCard';
+import WeatherCard from '@/components/WeatherCard';
+import type { WeatherCardProps } from '@/components/WeatherCard';
 
 type ComponentType = 'weather';
 

@@ -10,7 +10,10 @@ import type { Document } from '@langchain/core/documents';
 import type { ChatMessage } from './utils';
 
 import { initSettings, getSettings, saveSettings } from './settings';
+
 import { calculateVectorPositions } from './vector-analysis';
+import { WebDAVSync, WebDAVConfig } from './sync/webdav';
+import { STORAGE_CONFIG } from './config';
 
 // ============ 类型定义 ============
 
@@ -58,7 +61,16 @@ type WorkerMessage =
         enableSummaryMemory?: boolean;
       };
     }
-  | { type: 'run-agent'; input: string };
+
+  | { type: 'run-agent'; input: string }
+  | {
+      type: 'test-webdav-connection';
+      settings: WebDAVConfig;
+    }
+  | {
+      type: 'sync-files';
+      settings: WebDAVConfig;
+    };
 
 // 消息处理器上下文
 interface HandlerContext {
@@ -372,6 +384,36 @@ const handleRunAgent: MessageHandler = async (data, ctx) => {
     console.error('[Worker] Agent 运行失败:', e);
     return { success: false, error: (e as Error).message };
   }
+
+};
+
+/** 测试 WebDAV 连接处理器 */
+const handleTestWebDAVConnection: MessageHandler = async (data) => {
+  const { settings } = data as { settings: WebDAVConfig };
+  console.log('[Worker] 测试 WebDAV 连接:', settings.url);
+  
+  try {
+    const webdav = new WebDAVSync(settings);
+    const success = await webdav.testConnection();
+    return { success };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+};
+
+/** 同步文件处理器 */
+const handleSyncFiles: MessageHandler = async (data) => {
+  const { settings } = data as { settings: WebDAVConfig };
+  console.log('[Worker] 开始同步文件...');
+  
+  try {
+    const webdav = new WebDAVSync(settings);
+    await webdav.syncDirectory(STORAGE_CONFIG.dataDir);
+    return { success: true };
+  } catch (error) {
+    console.error('[Worker] 同步失败:', error);
+    return { success: false, error: (error as Error).message };
+  }
 };
 
 // ============ 消息处理器注册表 ============
@@ -391,6 +433,8 @@ const handlers: Record<string, MessageHandler> = {
   'save-settings': handleSaveSettings,
   'calculate-vector-positions': handleCalculateVectorPositions,
   'run-agent': handleRunAgent,
+  'test-webdav-connection': handleTestWebDAVConnection,
+  'sync-files': handleSyncFiles,
 };
 
 // ============ 主消息监听器 ============

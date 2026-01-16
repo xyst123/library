@@ -19,11 +19,11 @@ import {
   MessageOutlined,
   ExperimentOutlined,
 } from '@ant-design/icons';
-import { FileList, MessageItem, Settings, ErrorBoundary, VectorMap } from './components';
-import { useChat } from './hooks';
-import { colors } from './theme/colors';
-import { MESSAGES, UI_CONSTANTS } from './constants';
-import { formatError } from './utils';
+import { FileList, MessageItem, Settings, ErrorBoundary, VectorMap } from '@/components';
+import { useChat } from '@/hooks';
+import { colors } from '@/theme/colors';
+import { MESSAGES, UI_CONSTANTS } from '@/constants';
+import { formatError } from '@/utils';
 
 const { Header, Content, Sider } = Layout;
 const { Text } = Typography;

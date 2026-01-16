@@ -10,6 +10,10 @@ export interface AppSettings {
   enableReranking?: boolean;
   enableCRAG?: boolean;
   enableSummaryMemory?: boolean;
+  webdavUrl?: string;
+  webdavUsername?: string;
+  webdavPassword?: string;
+  enableWebdav?: boolean;
 }
 const SETTINGS_FILENAME = 'settings.json';
 
@@ -96,6 +100,10 @@ export const getSettings = (): AppSettings => {
     enableReranking: false,
     enableCRAG: false,
     enableSummaryMemory: false,
+    webdavUrl: '',
+    webdavUsername: '',
+    webdavPassword: '',
+    enableWebdav: false,
   };
 };
 

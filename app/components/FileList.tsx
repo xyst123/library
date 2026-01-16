@@ -1,8 +1,8 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { Button, Empty, Tooltip, Typography } from 'antd';
 import { UploadOutlined, FileTextOutlined, DeleteOutlined } from '@ant-design/icons';
-import { SUPPORTED_FILE_EXTENSIONS } from '../constants';
-import { useDragDrop } from '../hooks/common';
+import { SUPPORTED_FILE_EXTENSIONS } from '@/constants';
+import { useDragDrop } from '@/hooks/common';
 
 const { Text } = Typography;
 

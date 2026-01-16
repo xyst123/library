@@ -42,6 +42,10 @@ export interface AppSettings {
   enableReranking?: boolean;
   enableCRAG?: boolean;
   enableSummaryMemory?: boolean;
+  webdavUrl?: string;
+  webdavUsername?: string;
+  webdavPassword?: string;
+  enableWebdav?: boolean;
 }
 
 /** 历史消息格式（用于 IPC 传输） */
@@ -113,6 +117,10 @@ export interface ElectronAPI {
 
   // Agent
   runAgent: (input: string) => Promise<OperationResult>;
+
+  // WebDAV
+  testWebDAVConnection: (settings: AppSettings) => Promise<{ success: boolean; error?: string }>;
+  syncFiles: (settings: AppSettings) => Promise<{ success: boolean; error?: string }>;
 
   // 通用事件
   on: (channel: string, callback: (...args: unknown[]) => void) => void;

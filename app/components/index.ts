@@ -4,5 +4,5 @@ export { default as WeatherCard } from './WeatherCard';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export { Settings } from './Settings';
 
-export type { Message, MessageSource, ToolCall } from '../types';
+export type { Message, MessageSource, ToolCall } from '@/types';
 export { VectorMap } from './VectorMap';

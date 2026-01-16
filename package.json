@@ -57,6 +57,7 @@
     "sharp": "^0.33.5",
     "sqlite-vss": "^0.1.2",
     "uuid": "^13.0.0",
+    "webdav": "^5.8.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {

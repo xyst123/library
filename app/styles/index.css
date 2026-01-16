@@ -151,6 +151,26 @@ body {
   backdrop-filter: blur(10px);
 }
 
+/* 修复 Input.Password 等带图标输入框的双重边框问题 */
+/* 修复 Input.Password 等带图标输入框的双重边框和背景叠加问题 */
+.ant-input-affix-wrapper .ant-input,
+.ant-input-affix-wrapper input {
+  border: none !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 修复浏览器自动填充的背景色问题 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #fff !important;
+  transition: background-color 5000s ease-in-out 0s;
+  background-color: transparent !important;
+}
+
 .ant-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }

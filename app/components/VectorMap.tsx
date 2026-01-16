@@ -6,8 +6,8 @@ import {
   ZoomOutOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { colors } from '../theme/colors';
-import type { VectorPoint } from '../types';
+import { colors } from '@/theme/colors';
+import type { VectorPoint } from '@/types';
 
 const { Text, Title } = Typography;
 

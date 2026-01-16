@@ -1,4 +1,4 @@
-import { SUPPORTED_FILE_EXTENSIONS } from '../constants';
+import { SUPPORTED_FILE_EXTENSIONS } from '@/constants';
 
 /**
  * 验证文件扩展名是否支持

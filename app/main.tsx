@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import App from './App';
+import App from '@/App';
 import './styles/index.css';
 
 const rootElement = document.getElementById('root');

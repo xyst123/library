@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { MessageInstance } from 'antd/es/message/interface';
-import type { Message } from '../components';
+import type { Message } from '@/components';
 
 interface UseChatOptions {
   provider?: string;

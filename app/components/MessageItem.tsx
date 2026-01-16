@@ -13,11 +13,11 @@ import {
 import { RobotOutlined, UserOutlined, CopyOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { renderComponent } from './ComponentParser';
-import { colors } from '../theme/colors';
-import type { Message, ToolCall } from '../types';
-import { MESSAGES, UI_CONSTANTS } from '../constants';
-import './MessageItem.css';
+import { renderComponent } from '@/components/ComponentParser';
+import { colors } from '@/theme/colors';
+import type { Message, ToolCall } from '@/types';
+import { MESSAGES, UI_CONSTANTS } from '@/constants';
+import '@/components/MessageItem.css';
 
 const { Text } = Typography;
 

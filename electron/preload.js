@@ -24,7 +24,10 @@ const IPC_EVENTS = {
   MODEL_DOWNLOAD_PROGRESS: 'model-download-progress',
   RUN_AGENT: 'run-agent',
   AGENT_THOUGHT: 'agent-thought',
+  AGENT_THOUGHT: 'agent-thought',
   AGENT_TOOL_OUTPUT: 'agent-tool-output',
+  TEST_WEBDAV_CONNECTION: 'test-webdav-connection',
+  SYNC_FILES: 'sync-files',
 };
 
 // 允许监听的事件
@@ -64,8 +67,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onIngestProgress: (cb) => listen(IPC_EVENTS.INGEST_PROGRESS, cb),
   onModelDownloadProgress: (cb) => listen(IPC_EVENTS.MODEL_DOWNLOAD_PROGRESS, cb),
   runAgent: (input) => invoke(IPC_EVENTS.RUN_AGENT, { input }),
+  runAgent: (input) => invoke(IPC_EVENTS.RUN_AGENT, { input }),
   onAgentThought: (cb) => listen(IPC_EVENTS.AGENT_THOUGHT, cb),
   onAgentToolOutput: (cb) => listen(IPC_EVENTS.AGENT_TOOL_OUTPUT, cb),
+  testWebDAVConnection: (settings) => invoke(IPC_EVENTS.TEST_WEBDAV_CONNECTION, settings),
+  syncFiles: (settings) => invoke(IPC_EVENTS.SYNC_FILES, settings),
   
   on: (channel, cb) => LISTEN_CHANNELS.includes(channel) && listen(channel, cb),
   removeListener: (channel) => ipcRenderer.removeAllListeners(channel),
