@@ -227,3 +227,4 @@ ipcMain.handle('stop-generation', async () => {
 ipcMain.handle('get-settings', createWorkerProxy('get-settings', null, { chunkingStrategy: 'character' }));
 ipcMain.handle('save-settings', createWorkerProxy('save-settings', (settings) => ({ settings })));
 ipcMain.handle('calculate-vector-positions', createWorkerProxy('calculate-vector-positions', (data) => data));
+ipcMain.handle('run-agent', createWorkerProxy('run-agent', (data) => data));

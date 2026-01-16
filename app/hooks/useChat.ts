@@ -103,18 +103,62 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
         });
       };
 
+      const handleAgentThought = (_event: unknown, data: { content: string }) => {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last.role === 'assistant') {
+            // 将思考内容添加到内容中还是作为一个特殊的块？目前先附加到内容中，并保留格式
+            const newContent = last.content ? last.content + '\n\n' + data.content : data.content;
+            return [...prev.slice(0, -1), { ...last, content: newContent }];
+          }
+          return prev;
+        });
+      };
+
+      const handleAgentToolOutput = (_event: unknown, data: { content: string }) => {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last.role === 'assistant') {
+            const newContent = last.content ? last.content + '\n' + data.content : data.content;
+            return [...prev.slice(0, -1), { ...last, content: newContent }];
+          }
+          return prev;
+        });
+      };
+
       window.electronAPI.onAnswerStart(handleAnswerStart);
       window.electronAPI.onAnswerChunk(handleChunk);
       window.electronAPI.onToolCalls(handleToolCalls);
 
+      // Agent 事件监听器
+      window.electronAPI.onAgentThought(handleAgentThought);
+      window.electronAPI.onAgentToolOutput(handleAgentToolOutput);
+
       try {
         const history = messages.map((m) => ({ role: m.role, content: m.content }));
-        const result = await window.electronAPI.askQuestion(question, history, provider);
+        let result;
+
+        // 检查是否为 Agent 指令
+        if (question.startsWith('/admin') || question.startsWith('/agent')) {
+          const input = question.replace(/^\/(admin|agent)\s+/, '');
+          result = await window.electronAPI.runAgent(input);
+
+          // 如果 runAgent 没有返回最终答案（它流式传输思考过程），则模拟一个
+          if (result.success && !result.answer) {
+            // 通常最后的思考或工具输出就是答案，但我们已经流式传输了它。
+            // 确保不会报错即可。
+            result.answer = '';
+          }
+        } else {
+          result = await window.electronAPI.askQuestion(question, history, provider);
+        }
 
         // 移除事件监听器
         window.electronAPI.removeListener('answer-start');
         window.electronAPI.removeListener('answer-chunk');
         window.electronAPI.removeListener('tool-calls');
+        window.electronAPI.removeListener('agent-thought');
+        window.electronAPI.removeListener('agent-tool-output');
 
         if (result.success) {
           // 更新最终消息内容（保留已设置的 sources 和 toolCalls）

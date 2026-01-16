@@ -21,6 +21,8 @@ export interface Message {
 export interface OperationResult {
   success: boolean;
   error?: string;
+  answer?: string;
+  sources?: MessageSource[];
 }
 
 export interface FileListResult extends OperationResult {
@@ -109,6 +111,9 @@ export interface ElectronAPI {
   // 向量地图
   calculateVectorPositions: (query?: string) => Promise<{ points: VectorPoint[] }>;
 
+  // Agent
+  runAgent: (input: string) => Promise<OperationResult>;
+
   // 通用事件
   on: (channel: string, callback: (...args: unknown[]) => void) => void;
   removeListener: (channel: string) => void;
@@ -133,6 +138,8 @@ export interface ElectronAPI {
     ) => void
   ) => void;
   onModelDownloadProgress: (callback: (event: unknown, data: ModelDownloadStatus) => void) => void;
+  onAgentThought: (callback: (event: unknown, data: { content: string }) => void) => void;
+  onAgentToolOutput: (callback: (event: unknown, data: { content: string }) => void) => void;
 }
 
 declare global {

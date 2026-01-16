@@ -1,7 +1,8 @@
-/* MessageItem Markdown 样式 */
 .markdown-content {
   color: var(--color-text-primary, #fff);
   line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* ... existing markdown styles ... */

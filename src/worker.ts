@@ -4,12 +4,34 @@ import { loadAndSplit } from './loader';
 import { getVectorStore, ingestDocs, getHistory, addHistory, clearHistory } from './sqliteStore';
 import { askQuestionStream } from './rag';
 import { createCRAGGraph } from './crag';
+import { runFileAdminAgent } from './agent/file-admin';
 import { LLMProvider, RAG_CONFIG } from './config';
 import type { Document } from '@langchain/core/documents';
 import type { ChatMessage } from './utils';
 
 import { initSettings, getSettings, saveSettings } from './settings';
 import { calculateVectorPositions } from './vector-analysis';
+
+// ============ 类型定义 ============
+
+interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+interface AgentMessage {
+  content?: string;
+  tool_calls?: ToolCall[];
+}
+
+interface AgentChunk {
+  agent?: {
+    messages: AgentMessage[];
+  };
+  tools?: {
+    messages: AgentMessage[];
+  };
+}
 
 // 消息类型定义
 type WorkerMessage =
@@ -35,7 +57,8 @@ type WorkerMessage =
         enableReranking?: boolean;
         enableSummaryMemory?: boolean;
       };
-    };
+    }
+  | { type: 'run-agent'; input: string };
 
 // 消息处理器上下文
 interface HandlerContext {
@@ -49,7 +72,7 @@ type MessageHandler = (data: WorkerMessage, ctx: HandlerContext) => Promise<obje
 let isInitialized = false;
 let currentController: AbortController | null = null;
 
-// ============ 消息处理器实现 ============
+// 消息处理器实现
 
 /** 初始化处理器 */
 const handleInit: MessageHandler = async () => {
@@ -211,7 +234,7 @@ const handleAskQuestion: MessageHandler = async (data, ctx) => {
   } catch (error: unknown) {
     if (currentController.signal.aborted) {
       console.log('[Worker] 生成已停止');
-      return { success: false, error: 'Aborted' };
+      return { success: false, error: '已中止' };
     }
     throw error;
   } finally {
@@ -287,6 +310,70 @@ const handleCalculateVectorPositions: MessageHandler = async (data) => {
   return calculateVectorPositions(query);
 };
 
+/** 运行 Agent 处理器 */
+const handleRunAgent: MessageHandler = async (data, ctx) => {
+  const { input } = data as { input: string };
+  console.log('[Worker] 正在运行 Agent，输入:', input);
+
+  try {
+    const settings = getSettings();
+    const provider = settings.provider === 'gemini' ? LLMProvider.GEMINI : LLMProvider.DEEPSEEK;
+    const stream = await runFileAdminAgent(input, provider);
+
+    let finalAnswer = '';
+
+    for await (const chunk of stream) {
+      if (!chunk) continue;
+
+      const typedChunk = chunk as AgentChunk;
+
+      // 处理 "agent" 节点输出 (思考/行动) 或 "tools" 节点输出
+      if (typedChunk.agent) {
+        // Agent 思考/行动
+        const messages = typedChunk.agent.messages;
+        if (messages && messages.length > 0) {
+          const lastMsg = messages[messages.length - 1];
+
+          // 识别工具调用
+          if (lastMsg.tool_calls && lastMsg.tool_calls.length > 0) {
+            for (const tc of lastMsg.tool_calls) {
+              // 发送思考过程给前端
+              ctx.postProgress({
+                type: 'agent-thought',
+                content: `[思考] 我需要使用工具 ${tc.name}，参数: ${JSON.stringify(tc.args)}`,
+              });
+            }
+          } else if (lastMsg.content) {
+            // 这通常是普通的回复或思考
+            const content =
+              typeof lastMsg.content === 'string'
+                ? lastMsg.content
+                : JSON.stringify(lastMsg.content);
+            ctx.postProgress({ type: 'agent-thought', content: content });
+            finalAnswer = content; // 更新最终答案
+          }
+        }
+      } else if (typedChunk.tools) {
+        // 工具输出
+        const messages = typedChunk.tools.messages;
+        if (messages && messages.length > 0) {
+          const lastMsg = messages[messages.length - 1];
+          const content =
+            typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content);
+          ctx.postProgress({ type: 'agent-tool-output', content: `[观察] ${content}` });
+        }
+      }
+    }
+
+    // LangGraph 通常不会将 "最终答案" 与最后一条消息明确分开，
+    // 我们假设如果后面没有工具调用，最后一条 'agent-thought' 就是答案。
+    return { success: true, answer: finalAnswer };
+  } catch (e) {
+    console.error('[Worker] Agent 运行失败:', e);
+    return { success: false, error: (e as Error).message };
+  }
+};
+
 // ============ 消息处理器注册表 ============
 
 const handlers: Record<string, MessageHandler> = {
@@ -303,6 +390,7 @@ const handlers: Record<string, MessageHandler> = {
   'get-settings': handleGetSettings,
   'save-settings': handleSaveSettings,
   'calculate-vector-positions': handleCalculateVectorPositions,
+  'run-agent': handleRunAgent,
 };
 
 // ============ 主消息监听器 ============
@@ -331,7 +419,7 @@ parentPort.on('message', async (message: { id: string; data: WorkerMessage }) =>
     parentPort?.postMessage({ id, success: true, data: result });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error(`[Worker] 处理错误 ${data.type}:`, error);
+    console.error(`[Worker] 处理消息失败 ${data.type}:`, error);
     parentPort?.postMessage({ id, success: false, error: err.message });
   }
 });

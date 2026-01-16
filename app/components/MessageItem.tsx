@@ -8,6 +8,7 @@ import {
   Popover,
   Tag,
   Avatar,
+  Spin,
 } from 'antd';
 import { RobotOutlined, UserOutlined, CopyOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
@@ -83,6 +84,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
         style={{
           maxWidth: isUser ? UI_CONSTANTS.MAX_MESSAGE_WIDTH : undefined,
           flex: isUser ? undefined : 1,
+          minWidth: 0, // Prevent flex item from overflowing container when content is wide
           marginRight: isUser ? 0 : 44, // Align with User bubble (Avatar 32 + Margin 12)
           background: isUser
             ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.15) 100%)'
@@ -100,6 +102,13 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
             {/* 用户消息直接显示，助手消息使用混合渲染 */}
             {isUser ? (
               <Text style={{ color: '#fff', whiteSpace: 'pre-wrap' }}>{message.content}</Text>
+            ) : isStreaming &&
+              !message.content &&
+              (!message.toolCalls || message.toolCalls.length === 0) ? (
+              <Space>
+                <Spin size="small" />
+                <Text style={{ color: colors.text.secondary }}>AI 正在思考...</Text>
+              </Space>
             ) : (
               <AssistantContent
                 content={message.content}

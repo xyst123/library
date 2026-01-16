@@ -38,6 +38,12 @@ body {
   color: #e2e8f0;
 }
 
+/* 全局文字选中样式 */
+::selection {
+  background: rgba(0, 243, 255, 0.3); /* --tech-primary with opacity */
+  color: #fff;
+}
+
 /* 滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;

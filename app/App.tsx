@@ -3,10 +3,8 @@ import type React from 'react';
 import {
   Layout,
   Button,
-  Card,
   Space,
   Typography,
-  Spin,
   App as AntApp,
   Empty,
   Popconfirm,
@@ -20,13 +18,11 @@ import {
   SettingOutlined,
   MessageOutlined,
   ExperimentOutlined,
-  AudioOutlined,
-  PaperClipOutlined,
 } from '@ant-design/icons';
 import { FileList, MessageItem, Settings, ErrorBoundary, VectorMap } from './components';
 import { useChat } from './hooks';
 import { colors } from './theme/colors';
-import { MESSAGES, UI_CONSTANTS, TRANSITIONS } from './constants';
+import { MESSAGES, UI_CONSTANTS } from './constants';
 import { formatError } from './utils';
 
 const { Header, Content, Sider } = Layout;
@@ -378,25 +374,6 @@ const AppContent: React.FC = () => {
                   ))
                 )}
 
-                {loading && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 12 }}>
-                    <Card
-                      size="small"
-                      style={{
-                        background: colors.background.pill, // 使用新的药丸背景常量
-                        border: `1px solid ${colors.border.light}`,
-                        backdropFilter: 'blur(10px)',
-                      }}
-                    >
-                      <Space>
-                        <Spin size="small" />
-                        <Text style={{ color: colors.text.secondary }} className="streaming-cursor">
-                          AI 正在思考
-                        </Text>
-                      </Space>
-                    </Card>
-                  </div>
-                )}
                 <div ref={messagesEndRef} />
               </div>
 

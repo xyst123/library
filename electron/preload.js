@@ -22,6 +22,9 @@ const IPC_EVENTS = {
   CALCULATE_VECTOR_POSITIONS: 'calculate-vector-positions',
   INGEST_PROGRESS: 'ingest-progress',
   MODEL_DOWNLOAD_PROGRESS: 'model-download-progress',
+  RUN_AGENT: 'run-agent',
+  AGENT_THOUGHT: 'agent-thought',
+  AGENT_TOOL_OUTPUT: 'agent-tool-output',
 };
 
 // 允许监听的事件
@@ -31,6 +34,10 @@ const LISTEN_CHANNELS = [
   IPC_EVENTS.ANSWER_START,
   IPC_EVENTS.ANSWER_CHUNK,
   IPC_EVENTS.TOOL_CALLS,
+  IPC_EVENTS.ANSWER_CHUNK,
+  IPC_EVENTS.TOOL_CALLS,
+  IPC_EVENTS.AGENT_THOUGHT,
+  IPC_EVENTS.AGENT_TOOL_OUTPUT,
 ];
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
@@ -56,6 +63,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onToolCalls: (cb) => listen(IPC_EVENTS.TOOL_CALLS, cb),
   onIngestProgress: (cb) => listen(IPC_EVENTS.INGEST_PROGRESS, cb),
   onModelDownloadProgress: (cb) => listen(IPC_EVENTS.MODEL_DOWNLOAD_PROGRESS, cb),
+  runAgent: (input) => invoke(IPC_EVENTS.RUN_AGENT, { input }),
+  onAgentThought: (cb) => listen(IPC_EVENTS.AGENT_THOUGHT, cb),
+  onAgentToolOutput: (cb) => listen(IPC_EVENTS.AGENT_TOOL_OUTPUT, cb),
   
   on: (channel, cb) => LISTEN_CHANNELS.includes(channel) && listen(channel, cb),
   removeListener: (channel) => ipcRenderer.removeAllListeners(channel),
