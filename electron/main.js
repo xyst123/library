@@ -111,6 +111,7 @@ const createWindow = () => {
     height: 700,
     minWidth: 800,
     minHeight: 600,
+    icon: path.join(__dirname, '../build/icon.png'), // 设置应用图标 (Linux/Windows 以及开发环境)
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -139,6 +140,12 @@ app.whenReady().then(() => {
 
   // 启动 MCP 服务
   startMcpServer(sendToWorker).catch((err) => console.error('MCP 服务启动失败:', err));
+
+  // macOS 开发环境下强制设置 Dock 图标
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const iconPath = path.join(__dirname, '../build/icon.png');
+    app.dock.setIcon(iconPath);
+  }
 });
 
 app.on('window-all-closed', () => {

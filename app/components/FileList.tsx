@@ -56,6 +56,8 @@ FileItem.displayName = 'FileItem';
 interface FileListProps {
   /** 文件路径列表 */
   fileList: string[];
+  /** 文档块总数 */
+  documentCount: number;
   /** 是否正在上传 */
   uploading: boolean;
   /** 上传按钮点击回调 */
@@ -71,7 +73,7 @@ interface FileListProps {
  * 展示知识库中的文件，支持上传和拖放
  */
 const FileList: React.FC<FileListProps> = memo(
-  ({ fileList, uploading, onUpload, onDelete, onFilesDropped }) => {
+  ({ fileList, documentCount, uploading, onUpload, onDelete, onFilesDropped }) => {
     // 使用拖放 hook
     const { dragProps, dragStyle } = useDragDrop({
       allowedExtensions: SUPPORTED_FILE_EXTENSIONS,
@@ -101,9 +103,25 @@ const FileList: React.FC<FileListProps> = memo(
           上传文件
         </Button>
 
-        <div style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            marginBottom: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <Text type="secondary" style={{ fontSize: 12 }}>
             知识库列表 ({fileList.length})
+          </Text>
+          <Text
+            style={{
+              fontSize: '12px',
+              color: '#00f3ff', // colors.primary hardcoded or imported? colors not imported here. Using cyan hex.
+              textShadow: '0 0 10px rgba(0, 243, 255, 0.4)',
+            }}
+          >
+            {documentCount} 文档块
           </Text>
         </div>
 

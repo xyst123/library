@@ -12,6 +12,7 @@ import {
   Popconfirm,
   ConfigProvider,
   theme,
+  Segmented,
 } from 'antd';
 import { Sender } from '@ant-design/x';
 import {
@@ -225,6 +226,8 @@ const AppContent: React.FC = () => {
         className="tech-header"
         style={
           {
+            height: UI_CONSTANTS.HEADER_HEIGHT,
+            lineHeight: `${UI_CONSTANTS.HEADER_HEIGHT}px`,
             padding: '0 24px',
             display: 'flex',
             alignItems: 'center',
@@ -239,35 +242,32 @@ const AppContent: React.FC = () => {
           style={{ WebkitAppRegion: 'no-drag', marginLeft: 'auto' } as React.CSSProperties}
         >
           {/* 视图切换 */}
+          {/* 视图切换 Tabs */}
           <div style={{ marginRight: 16 }}>
-            <Button
-              type={currentView === 'chat' ? 'primary' : 'text'}
-              icon={<MessageOutlined />}
-              onClick={() => setCurrentView('chat')}
-              style={{ marginRight: 8 }}
-            >
-              对话
-            </Button>
-            <Button
-              type={currentView === 'map' ? 'primary' : 'text'}
-              icon={<ExperimentOutlined />}
-              onClick={() => setCurrentView('map')}
-            >
-              知识星图
-            </Button>
+            <Segmented
+              value={currentView}
+              onChange={(value) => setCurrentView(value as 'chat' | 'map')}
+              options={[
+                {
+                  label: '对话',
+                  value: 'chat',
+                  icon: <MessageOutlined />,
+                },
+                {
+                  label: '知识星图',
+                  value: 'map',
+                  icon: <ExperimentOutlined />,
+                },
+              ]}
+              className="tech-segmented"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: colors.text.secondary,
+              }}
+            />
           </div>
 
-          <Text
-            className="tech-text-primary"
-            style={{
-              fontWeight: 'bold',
-              fontSize: '14px',
-              color: colors.primary,
-              textShadow: colors.shadow.primary,
-            }}
-          >
-            {documentCount} 文档块
-          </Text>
           <Popconfirm
             title={MESSAGES.HISTORY.CONFIRM}
             onConfirm={clearHistory}
@@ -276,52 +276,35 @@ const AppContent: React.FC = () => {
           >
             <Button
               type="text"
+              className="interactive-icon"
               icon={<ClearOutlined />}
               title="清空历史"
+              onClick={clearHistory}
               style={{
-                color: colors.text.secondary,
                 fontSize: UI_CONSTANTS.BUTTON_FONT_SIZE,
-                transition: TRANSITIONS.DEFAULT,
-              }}
-              onMouseEnter={(e) => {
-                Object.assign(e.currentTarget.style, {
-                  color: colors.danger,
-                  background: colors.background.hover.danger,
-                  transform: 'scale(1.1)',
-                });
-              }}
-              onMouseLeave={(e) => {
-                Object.assign(e.currentTarget.style, {
-                  color: colors.text.secondary,
-                  background: colors.background.transparent,
-                  transform: 'scale(1)',
-                });
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             />
           </Popconfirm>
           <Button
             type="text"
+            className="interactive-icon"
             icon={<SettingOutlined />}
             title="设置"
             onClick={() => setSettingsVisible(true)}
             style={{
-              color: colors.text.secondary,
               fontSize: UI_CONSTANTS.BUTTON_FONT_SIZE,
-              transition: TRANSITIONS.DEFAULT,
-            }}
-            onMouseEnter={(e) => {
-              Object.assign(e.currentTarget.style, {
-                color: colors.primary,
-                background: colors.background.hover.primary,
-                transform: 'rotate(90deg) scale(1.1)',
-              });
-            }}
-            onMouseLeave={(e) => {
-              Object.assign(e.currentTarget.style, {
-                color: colors.text.secondary,
-                background: colors.background.transparent,
-                transform: 'rotate(0deg) scale(1)',
-              });
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           />
         </Space>
@@ -339,6 +322,7 @@ const AppContent: React.FC = () => {
         >
           <FileList
             fileList={fileList}
+            documentCount={documentCount}
             uploading={uploading}
             onUpload={handleUpload}
             onDelete={handleDeleteFile}
@@ -365,8 +349,8 @@ const AppContent: React.FC = () => {
                   flex: 1,
                   overflow: 'auto',
                   marginBottom: 0,
-                  padding: '24px 48px 120px 48px', // 底部留白，为悬浮输入框预留空间
-                  maxWidth: '1200px', // 更宽的视野
+                  padding: '24px 0 120px 0', // 底部留白，为悬浮输入框预留空间
+                  maxWidth: '1600px', // 更宽的视野
                   width: '100%',
                   margin: '0 auto',
                   zIndex: 0,
@@ -416,53 +400,40 @@ const AppContent: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* 输入区域 - 悬浮胶囊 */}
+              {/* 渐变过渡层 */}
               <div
                 style={{
                   position: 'absolute',
-                  bottom: 30,
+                  bottom: '0',
                   left: 0,
                   right: 0,
-                  zIndex: 100,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  pointerEvents: 'none', // 允许点击穿透到背后/两侧的内容
+                  height: `${UI_CONSTANTS.GRADIENT_HEIGHT}px`,
+                  background:
+                    'linear-gradient(to bottom, rgba(10, 15, 30, 0) 0%, rgba(10, 15, 30, 0.85) 15%, rgba(10, 15, 30, 0.93) 30%, rgba(10, 15, 30, 0.96) 50%, rgba(10, 15, 30, 0.98) 70%, rgba(10, 15, 30, 0.99) 85%, rgba(10, 15, 30, 1) 100%)',
+                  pointerEvents: 'none',
+                  zIndex: 1,
                 }}
-              >
-                <div
-                  className="tech-input-pill"
-                  style={{
-                    width: '90%',
-                    maxWidth: '800px',
-                    pointerEvents: 'auto', // 重新启用输入框本身的指针事件
-                  }}
-                  onKeyDown={handleKeyDown}
-                >
-                  <Button
-                    type="text"
-                    icon={<AudioOutlined style={{ fontSize: 18, color: colors.primary }} />}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Button
-                    type="text"
-                    icon={<PaperClipOutlined style={{ fontSize: 18, color: colors.secondary }} />} // 电子紫
-                    onClick={handleUpload}
-                    style={{ marginRight: 8 }}
-                  />
+              />
 
-                  <div style={{ flex: 1 }}>
-                    <Sender
-                      className="tech-sender"
-                      value={input}
-                      onChange={setInput}
-                      onSubmit={handleSend}
-                      onCancel={stopGeneration}
-                      loading={loading}
-                      disabled={!!modelDownloading}
-                      placeholder={modelDownloading || '输入你的问题...'}
-                    />
-                  </div>
-                </div>
+              {/* 输入区域 */}
+              <div
+                style={{ padding: '0', position: 'relative', zIndex: 2 }}
+                onKeyDown={handleKeyDown}
+              >
+                <Sender
+                  className="tech-sender"
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={() => {
+                    handleSend();
+                  }}
+                  onCancel={stopGeneration}
+                  loading={loading}
+                  disabled={!!modelDownloading}
+                  placeholder={modelDownloading || '输入你的问题，按 Enter 发送（↑ 历史问题）...'}
+                  style={{ width: '100%' }}
+                  autoSize={{ minRows: 1, maxRows: 3 }}
+                />
               </div>
             </>
           )}

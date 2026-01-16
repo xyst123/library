@@ -1,5 +1,14 @@
 import React, { memo, useCallback } from 'react';
-import { Card, Space, Typography, Button, message as antdMessage, Popover, Tag } from 'antd';
+import {
+  Card,
+  Space,
+  Typography,
+  Button,
+  message as antdMessage,
+  Popover,
+  Tag,
+  Avatar,
+} from 'antd';
 import { RobotOutlined, UserOutlined, CopyOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -54,20 +63,40 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
         marginBottom: 12,
       }}
     >
+      {/* Avatar - Left for Assistant */}
+      {!isUser && (
+        <Avatar
+          className="interactive-icon interactive-avatar"
+          icon={<RobotOutlined />}
+          style={{
+            marginRight: 12,
+            marginTop: 4,
+            flexShrink: 0,
+            // backgroundColor removed to let CSS handle transparent -> hover color
+          }}
+        />
+      )}
+
       <Card
         size="small"
+        className="message-card"
         style={{
-          maxWidth: UI_CONSTANTS.MAX_MESSAGE_WIDTH,
-          background: isUser ? colors.gradient.user : colors.background.overlay, // 毛玻璃背景
-          border: isUser ? 'none' : `1px solid ${colors.border.light}`,
-          color: isUser ? colors.text.dark : colors.text.primary,
-          backdropFilter: 'blur(10px)',
+          maxWidth: isUser ? UI_CONSTANTS.MAX_MESSAGE_WIDTH : undefined,
+          flex: isUser ? undefined : 1,
+          marginRight: isUser ? 0 : 44, // Align with User bubble (Avatar 32 + Margin 12)
+          background: isUser
+            ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.15) 100%)'
+            : 'rgba(10, 15, 30, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          color: colors.text.primary,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: isUser ? '4px 0px 4px 4px' : '0px 4px 4px 4px',
+          boxShadow: isUser ? '0 2px 8px rgba(0, 0, 0, 0.2)' : '0 2px 12px rgba(0, 243, 255, 0.15)',
         }}
       >
         <Space orientation="vertical" style={{ width: '100%' }}>
           <Space align="start">
-            {!isUser && <RobotOutlined style={{ color: colors.primary, fontSize: 16 }} />}
-
             {/* 用户消息直接显示，助手消息使用混合渲染 */}
             {isUser ? (
               <Text style={{ color: '#fff', whiteSpace: 'pre-wrap' }}>{message.content}</Text>
@@ -78,8 +107,6 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
                 isStreaming={isStreaming} // 通过父组件属性传递
               />
             )}
-
-            {isUser && <UserOutlined style={{ color: '#fff', fontSize: 16 }} />}
           </Space>
 
           {/* 参考来源 - 交互式卡片 */}
@@ -118,11 +145,15 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
                           alignItems: 'center',
                         }}
                       >
-                        <Text strong style={{ color: colors.primary }}>
+                        <Text style={{ color: colors.text.primary }}>
                           [{idx + 1}] {s.source.split('/').pop()}
                         </Text>
                         {s.score && (
-                          <Tag color="blue" variant="filled">
+                          <Tag
+                            color="cyan"
+                            bordered={false}
+                            style={{ background: 'rgba(0, 243, 255, 0.2)', color: colors.primary }}
+                          >
                             {(1 - s.score).toFixed(2)}
                           </Tag>
                         )}
@@ -142,31 +173,31 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
                     }}
                   >
                     <div
+                      className="interactive-icon"
                       style={{
                         minWidth: 120,
                         maxWidth: 160,
                         padding: '8px 12px',
-                        background: colors.background.overlay,
-                        border: `1px solid ${colors.border.light}`,
                         borderRadius: 8,
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
                         fontSize: 12,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = colors.background.hover.primary;
-                        e.currentTarget.style.borderColor = colors.primary;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = colors.background.overlay;
-                        e.currentTarget.style.borderColor = colors.border.light;
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                        <span className="tech-citation" style={{ marginRight: 6 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginBottom: 4,
+                          width: '100%',
+                        }}
+                      >
+                        <span style={{ marginRight: 6, fontSize: 10, color: '#fff' }}>
                           {idx + 1}
                         </span>
-                        <Text ellipsis style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
+                        <Text ellipsis style={{ color: 'inherit', fontSize: 12, flex: 1 }}>
                           {s.source.split('/').pop()}
                         </Text>
                       </div>
@@ -203,6 +234,20 @@ const MessageItem: React.FC<MessageItemProps> = memo(({ message, isStreaming }) 
           )}
         </Space>
       </Card>
+
+      {/* Avatar - Right for User */}
+      {isUser && (
+        <Avatar
+          className="interactive-icon interactive-avatar"
+          icon={<UserOutlined />}
+          style={{
+            marginLeft: 12,
+            marginTop: 4,
+            flexShrink: 0,
+            // Transparent by default via interactive-icon
+          }}
+        />
+      )}
     </div>
   );
 });

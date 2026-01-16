@@ -4,6 +4,9 @@
   line-height: 1.6;
 }
 
+/* ... existing markdown styles ... */
+/* Keep existing styles but append .message-card styles */
+
 .markdown-content p {
   margin: 0 0 0.5em 0;
 }
@@ -81,4 +84,22 @@
 
 .markdown-content a:hover {
   text-decoration: underline;
+}
+
+/* New Message Card Styles */
+/* New Message Card Styles */
+.message-card {
+  transition: all 0.3s ease !important;
+}
+
+.message-card:hover {
+  transform: translateY(-2px);
+  /* Stronger Cyan glow on hover */
+  box-shadow: 0 8px 32px rgba(0, 243, 255, 0.4) !important;
+  /* Strictly match default border to prevent any hover change */
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-card-bordered.message-card {
+  border: 1px solid rgba(255, 255, 255, 0.08); /* Match TSX default */
 }

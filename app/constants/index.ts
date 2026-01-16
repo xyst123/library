@@ -4,10 +4,10 @@ export const SUPPORTED_FILE_EXTENSIONS = ['txt', 'md', 'pdf', 'docx', 'html'] as
 // UI 相关常量
 export const UI_CONSTANTS = {
   SIDEBAR_WIDTH: 280,
-  HEADER_HEIGHT: 64,
+  HEADER_HEIGHT: 48,
   GRADIENT_HEIGHT: 120,
   BUTTON_FONT_SIZE: 16,
-  MAX_MESSAGE_WIDTH: '75%',
+  MAX_MESSAGE_WIDTH: '85%',
 } as const;
 
 // 消息提示

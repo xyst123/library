@@ -174,7 +174,6 @@ body {
     inset 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
-/* 药丸内的自定义发送器 */
 .tech-sender .ant-input,
 .tech-sender .ant-input-wrapper,
 .tech-sender .ant-sender-content,
@@ -182,9 +181,6 @@ body {
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
-  padding: 0 !important;
-  resize: none !important;
-  min-height: 24px !important;
 }
 
 .tech-sender .ant-input:focus {
@@ -243,4 +239,63 @@ body {
   animation: glow-pulse 1s infinite;
   display: inline-block;
   margin-left: 2px;
+}
+
+/* 交互式图标 (头像、按钮、文档) */
+.interactive-icon {
+  background: transparent !important;
+  border: 1px solid transparent !important; /* No visible circle by default */
+  color: rgba(255, 255, 255, 0.8) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer;
+}
+
+.interactive-icon:hover {
+  border-color: transparent !important; /* No border on hover, just color/bg/shadow */
+  color: var(--tech-primary) !important;
+  background: rgba(0, 243, 255, 0.1) !important;
+  box-shadow: 0 0 12px rgba(0, 243, 255, 0.2) !important;
+  transform: scale(1.1); /* slightly larger scale */
+}
+
+/* 针对 Avatar 的特殊圆角 */
+.ant-avatar.interactive-icon {
+  border-radius: 50% !important;
+}
+
+/* 自定义 Segmented 控件样式 - 纯文字模式 */
+.tech-segmented.ant-segmented,
+.tech-segmented .ant-segmented-group,
+.tech-segmented .ant-segmented-item,
+.tech-segmented .ant-segmented-thumb,
+.tech-segmented .ant-segmented-item-selected,
+.tech-segmented .ant-segmented-item:hover,
+.tech-segmented .ant-segmented-item-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+.tech-segmented .ant-segmented-item {
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.3s;
+  padding: 0 12px; /* Add some spacing since box is gone */
+}
+
+/* 选中状态：文字高亮 + 发光，无背景 */
+.tech-segmented .ant-segmented-item-selected {
+  color: var(--tech-primary) !important;
+  text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+  font-weight: 600;
+}
+
+/* 悬浮状态：仅文字变亮，无背景 */
+.tech-segmented .ant-segmented-item:hover:not(.ant-segmented-item-selected) {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* 确保 label 继承颜色 */
+.tech-segmented .ant-segmented-item-label {
+  color: inherit !important;
 }
