@@ -12,7 +12,7 @@ import type { ChatMessage } from './utils';
 import { initSettings, getSettings, saveSettings } from './settings';
 
 import { calculateVectorPositions } from './vector-analysis';
-import { WebDAVSync, WebDAVConfig } from './sync/webdav';
+import { WebDAVSync, type WebDAVConfig } from './sync/webdav';
 import { STORAGE_CONFIG } from './config';
 
 // ============ 类型定义 ============
@@ -61,7 +61,6 @@ type WorkerMessage =
         enableSummaryMemory?: boolean;
       };
     }
-
   | { type: 'run-agent'; input: string }
   | {
       type: 'test-webdav-connection';
@@ -384,14 +383,13 @@ const handleRunAgent: MessageHandler = async (data, ctx) => {
     console.error('[Worker] Agent 运行失败:', e);
     return { success: false, error: (e as Error).message };
   }
-
 };
 
 /** 测试 WebDAV 连接处理器 */
 const handleTestWebDAVConnection: MessageHandler = async (data) => {
   const { settings } = data as { settings: WebDAVConfig };
   console.log('[Worker] 测试 WebDAV 连接:', settings.url);
-  
+
   try {
     const webdav = new WebDAVSync(settings);
     const success = await webdav.testConnection();
@@ -405,7 +403,7 @@ const handleTestWebDAVConnection: MessageHandler = async (data) => {
 const handleSyncFiles: MessageHandler = async (data) => {
   const { settings } = data as { settings: WebDAVConfig };
   console.log('[Worker] 开始同步文件...');
-  
+
   try {
     const webdav = new WebDAVSync(settings);
     await webdav.syncDirectory(STORAGE_CONFIG.dataDir);
